@@ -1,0 +1,379 @@
+@import url("https://fonts.googleapis.com/css2?family=Roboto:wght@100;300;400;500;700;900&display=swap");
+
+.color-primary {
+  color: #004084;
+}
+
+.color-primary-dark {
+  color: #022952;
+}
+
+.color-primary-ligth {
+  color: #7f9fc1;
+}
+
+footer a {
+  color: #fff;
+  text-decoration: none;
+  margin: 0 1em;
+}
+
+#fecha-solicitud {
+  color: rgb(0, 0, 0);
+  font-size: 12px;
+  margin: 0;
+  background-color: rgba(0, 0, 0, 0.35);
+  position: fixed;
+  right: 0;
+  padding: 0.25em 1em;
+  border-radius: 0 0 0 0.5em;
+  top: 0;
+}
+
+.MuiFilledInput-root::after {
+  border-bottom: 2px solid #004084 !important;
+}
+
+.MuiFormLabel-root.Mui-focused {
+  color: #004084 !important;
+}
+
+.MuiInputLabel-root.Mui-error {
+  color: #d32f2f !important;
+}
+
+.MuiFilledInput-root {
+  background-color: #0000 !important;
+}
+
+.submit-button:hover {
+  background-color: #022952 !important;
+}
+
+.white-text {
+  color: #fff;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+  margin: 0;
+}
+
+body {
+  background-color: #fff;
+  padding: 0;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
+    Oxygen-Sans, Ubuntu, Cantarell, "Helvetica Neue", sans-serif;
+
+  h1,
+  h2,
+  h3,
+  h4,
+  h5,
+  h6 {
+    color: #004084;
+  }
+}
+
+.d-flex {
+  display: flex;
+}
+
+.align-items-center {
+  align-items: center;
+}
+
+.no-padding {
+  padding: 0 !important;
+}
+
+.encabezado {
+  background-color: #dbdbdb;
+  padding: 30px !important;
+  background-size: cover;
+  margin-bottom: 20px;
+  box-shadow: 0px 3px 8px 0px #c0c0c0;
+  border-bottom: 2px solid #fff;
+}
+
+footer {
+  background-color: #004084f0;
+  border-top: 2px solid red;
+  width: 100%;
+  display: block;
+  margin-top: auto;
+  bottom: 0;
+  z-index: 2;
+  position: fixed;
+  backdrop-filter: blur(0.2em);
+}
+
+.uppercase {
+  text-transform: uppercase;
+}
+
+.titulo-formulario {
+  margin-top: 0 !important;
+  display: flex;
+  flex-direction: column !important;
+  justify-content: space-between;
+}
+
+.container-button-submit {
+  justify-content: flex-end;
+}
+
+.modal-secundary-button:hover {
+  background-color: #7f9fc168;
+}
+
+.modal-primary-button:hover {
+  background-color: #022952 !important;
+}
+
+.encabezado {
+  padding: 10px;
+}
+
+.mega-logo img {
+  height: auto;
+}
+
+.titulo-formulario h3 {
+  font-size: 2.5em;
+}
+
+.mega-label {
+  font-size: 1em !important;
+  color: rgba(0, 0, 0, 0.6) !important;
+}
+
+.secciones {
+  background-color: rgb(234 241 247);
+  padding-left: 0;
+  border-radius: 0.5em;
+  padding: 1em;
+  margin-bottom: 1em;
+  display: flex;
+  flex-direction: column;
+}
+
+.subseccions {
+  border: solid 1px #aaa !important;
+  border-radius: 0.5em;
+  padding: 1em;
+  margin-bottom: 1em;
+}
+
+.mega-label {
+  margin-right: 1em;
+}
+
+.megalabel_2 {
+  font-size: 1rem;
+  color: gray;
+  margin-bottom: 0.5em;
+}
+
+.mensaje-montos-autorizados {
+  border: solid 1px #aaa !important;
+  border-radius: 0.5em;
+  padding: 1em;
+  background-color: #fff;
+}
+
+.MuiPaper-elevation {
+  border: 1px solid rgba(0, 0, 0, 0.42);
+  border-radius: ".5em";
+}
+
+.uploadFilesData {
+  align-items: flex-end !important;
+  flex-direction: column;
+}
+
+/*.uploadFilesData .MuiListItemSecondaryAction-root {
+   position: initial; 
+}*/
+
+.icon-link {
+  width: 96px;
+  height: 96px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  border: 2px solid rgba(0, 0, 0, 0.38);
+  padding: 1em;
+  border-radius: 8px;
+  text-align: center;
+  text-decoration: none;
+  color: black;
+  line-height: 1.1;
+}
+
+.icon-link:hover {
+  background-color: #f4faff;
+  box-shadow: 0px 0 10px 1px #0000002e;
+}
+
+.icon-link .MuiSvgIcon-root {
+  font-size: 40px;
+}
+
+.card-link {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  border: 2px solid #d9d9d9;
+  border-radius: 8px;
+  text-decoration: none;
+}
+
+.card-link:hover {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  border: 2px solid #004084;
+  border-radius: 8px;
+  text-decoration: none;
+  background-color: #0040840f;
+}
+
+.card-link:hover h5 {
+  color: #004084;
+}
+
+.card-link svg {
+  color: #004084;
+  padding: 0.5rem;
+  background-color: #d9d9d9;
+  width: 45px;
+  height: 45px;
+}
+
+.truncate-text {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 100px;
+  display: inline-block;
+  vertical-align: middle;
+}
+
+.required-fields-alert {
+  margin-top: 2em;
+}
+
+.innerform .MuiBox-root{
+width: 100%;
+}
+
+.fieldIcon{
+  max-width: 100% !important;
+}
+
+.fieldIcon input{
+  width: 85%;
+}
+
+@media (max-width: 600px) {
+  .form_tittle {
+    text-align: center;
+  }
+
+  .MuiStepper-root {
+    display: none !important;
+    background-color: hotpink;
+  }
+
+  .required-fields-alert {
+    margin-top: 0;
+  }
+
+  .encabezado .MuiGrid-container {
+    gap: 0.5em;
+  }
+
+  .encabezado {
+    padding: 1em !important;
+  }
+
+  .mega-logo .MuiBox-root {
+    padding-top: 1.5em;
+    padding-bottom: 0.5em;
+  }
+
+  .mega-logo img {
+    width: 50% !important;
+    height: auto;
+  }
+
+  .titulo-formulario h3 {
+    font-size: 1.4rem;
+    text-align: center;
+    margin-bottom: 0.5em;
+    font-weight: 400;
+  }
+
+  #fecha-solicitud {
+    font-size: 0.9rem;
+  }
+}
+
+/* Estilos CSS para personalizar los botones de radio */
+.radio-container {
+  display: flex;
+  flex-direction: row;
+  justify-content: center;
+  gap: 2em;
+  align-items: center;
+  margin: 0.5em 0;
+}
+
+.radio-label {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  text-decoration: none;
+  color: inherit;
+}
+
+.radio-label:hover {
+  opacity: 0.8;
+}
+
+.radio-input {
+  display: none;
+}
+
+.radio-input:checked + .radio-content .icon {
+  color: #1976d2;
+  transform: scale(1.1);
+}
+
+.radio-input:checked + .radio-content .text {
+  color: #1976d2;
+  font-weight: 500;
+}
+
+.radio-input:checked + .label {
+  border: 1px solid #1976d2 !important;
+}
+
+.icon {
+  color: rgba(0, 0, 0, 0.38);
+  font-size: 40px;
+  transition: all 0.3s ease;
+}
+
+.text {
+  font-weight: 300;
+  margin-top: 0.5em;
+  text-align: center;
+  transition: all 0.3s ease;
+}
