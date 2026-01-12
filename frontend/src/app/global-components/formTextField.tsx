@@ -18,6 +18,7 @@ interface FormTextFieldProps {
   type?: string
   select?: boolean;
   children?: React.ReactNode;
+  autoComplete?: string;
 }
 
 
@@ -36,7 +37,8 @@ const FormTextField: React.FC<FormTextFieldProps> = ({
   inputRef,
   select = false,
   type = "text",
-  children
+  children,
+  autoComplete
 }) => {
   return (
     <>
@@ -57,6 +59,7 @@ const FormTextField: React.FC<FormTextFieldProps> = ({
           inputRef={inputRef}
           type={select ? undefined : type}
           select={select}
+          autoComplete={autoComplete}
 
           sx={{
             "& .MuiFilledInput-root": {

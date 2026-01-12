@@ -28,6 +28,7 @@ export interface Usuario {
 	nombre_completo: string
 	email: string
 	rol_id: number
+	password_hash?: string
 	createdAt?: string
 	updatedAt?: string
 }

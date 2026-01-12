@@ -16,6 +16,8 @@ export interface ErrorResponse {
 }
 
 export interface DecodedToken {
+	id?: number
+	email?: string
 	nombre?: string
 	rol?: string
 	exp?: number
@@ -251,19 +253,19 @@ export const isAuthenticated = (): boolean => {
 			return false
 		}
 
-		// Verificar que el token tenga la estructura correcta (incluyendo nombre)
+		// Verificar que el token tenga la estructura correcta
 		try {
 			const decoded = decodeToken(token)
-			// Si el token no tiene nombre, puede ser un token antiguo, limpiarlo
-			if (!decoded.nombre && !decoded.email) {
-				console.warn('isAuthenticated - Token inválido (sin nombre ni email), limpiando')
-				clearAuthData()
+			// El token es válido si tiene email o nombre (email es requerido por el backend)
+			if (!decoded.email && !decoded.nombre) {
+				console.warn('isAuthenticated - Token inválido (sin email ni nombre)')
 				return false
 			}
 			return true
 		} catch (error) {
+			// Error al decodificar = token malformado, pero no limpiar aquí
+			// dejar que getToken maneje la limpieza si está expirado
 			console.error('isAuthenticated - Error al decodificar token:', error)
-			clearAuthData()
 			return false
 		}
 	} catch (error) {
@@ -302,31 +304,45 @@ export const validateAndCleanToken = (): void => {
 			return
 		}
 
+		// Verificar expiración primero usando getToken que ya valida esto
+		const validToken = getToken()
+		if (!validToken) {
+			// getToken ya limpió el token si estaba expirado, no hacer nada más
+			return
+		}
+
 		try {
-			const decoded = decodeToken(token)
-			// Si el token no tiene nombre, es un token antiguo, limpiarlo
-			if (!decoded.nombre) {
-				console.warn('validateAndCleanToken - Token antiguo sin campo "nombre" detectado, limpiando')
+			const decoded = decodeToken(validToken)
+			// Verificar que el token tenga los campos mínimos necesarios (email o nombre)
+			// Si tiene email, es válido (nombre es opcional en algunos tokens)
+			if (!decoded.email && !decoded.nombre) {
+				console.warn('validateAndCleanToken - Token inválido (sin email ni nombre), limpiando')
 				clearAuthData()
 				return
 			}
 
-			// Verificar que el nombre guardado coincida con el del token
-			const savedNombre = localStorage.getItem('user_nombre')
-			if (decoded.nombre && savedNombre !== decoded.nombre) {
-				console.log('validateAndCleanToken - Actualizando nombre en localStorage:', {
-					anterior: savedNombre,
-					nuevo: decoded.nombre
-				})
-				localStorage.setItem('user_nombre', decoded.nombre)
-				localStorage.setItem('user_rol', decoded.rol || '')
-				window.dispatchEvent(new CustomEvent('authChange', { detail: { authenticated: true, nombre: decoded.nombre } }))
+			// Actualizar nombre y rol en localStorage si están en el token
+			if (decoded.nombre) {
+				const savedNombre = localStorage.getItem('user_nombre')
+				if (savedNombre !== decoded.nombre) {
+					console.log('validateAndCleanToken - Actualizando nombre en localStorage:', {
+						anterior: savedNombre,
+						nuevo: decoded.nombre
+					})
+					localStorage.setItem('user_nombre', decoded.nombre)
+					if (decoded.rol) {
+						localStorage.setItem('user_rol', decoded.rol)
+					}
+				}
 			}
 		} catch (error) {
-			console.error('validateAndCleanToken - Error al validar token, limpiando:', error)
+			// Solo limpiar si es un error de decodificación (token malformado)
+			// No limpiar por otros errores que puedan ser temporales
+			console.error('validateAndCleanToken - Error al decodificar token (token malformado), limpiando:', error)
 			clearAuthData()
 		}
 	} catch (error) {
-		console.error('validateAndCleanToken - Error:', error)
+		console.error('validateAndCleanToken - Error inesperado:', error)
+		// No limpiar el token por errores inesperados
 	}
 }

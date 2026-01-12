@@ -80,11 +80,13 @@ export default function ConfiguracionPage() {
 	// Estados para modales de usuarios
 	const [modalUsuarioOpen, setModalUsuarioOpen] = useState(false)
 	const [usuarioEditando, setUsuarioEditando] = useState<Usuario | null>(null)
+	const [modalKey, setModalKey] = useState(0) // Key para forzar re-renderización del modal
 	const [formUsuario, setFormUsuario] = useState<Usuario>({
 		estado: 'ACTIVO',
 		nombre_completo: '',
 		email: '',
 		rol_id: 1,
+		password_hash: '',
 	})
 	
 	// Estados para mensajes
@@ -97,6 +99,18 @@ export default function ConfiguracionPage() {
 	useEffect(() => {
 		cargarDatos()
 	}, [])
+
+	// Función helper para crear un formulario vacío
+	const crearFormularioVacio = (): Usuario => {
+		const primerRolId = roles.length > 0 ? roles[0].id : 1
+		return {
+			estado: 'ACTIVO',
+			nombre_completo: '',
+			email: '',
+			rol_id: primerRolId || 1,
+			password_hash: '',
+		}
+	}
 
 	const cargarDatos = async () => {
 		await Promise.all([cargarParametros(), cargarRoles(), cargarUsuarios()])
@@ -265,39 +279,59 @@ export default function ConfiguracionPage() {
 	// ==================== USUARIOS ====================
 
 	const abrirModalCrearUsuario = () => {
+		// Limpiar estado completamente
 		setUsuarioEditando(null)
-		setFormUsuario({
-			estado: 'ACTIVO',
-			nombre_completo: '',
-			email: '',
-			rol_id: roles[0]?.id || 1,
-		})
-		setModalUsuarioOpen(true)
+		setFormUsuario(crearFormularioVacio())
+		// Cambiar la key para forzar re-renderización completa del modal
+		setModalKey(prev => prev + 1)
+		// Cerrar primero si está abierto
+		if (modalUsuarioOpen) {
+			setModalUsuarioOpen(false)
+			setTimeout(() => {
+				setModalUsuarioOpen(true)
+			}, 100)
+		} else {
+			setModalUsuarioOpen(true)
+		}
 	}
 
 	const abrirModalEditarUsuario = (usuario: Usuario) => {
 		setUsuarioEditando(usuario)
-		setFormUsuario({ ...usuario })
+		setFormUsuario({ ...usuario, password_hash: '' })
 		setModalUsuarioOpen(true)
 	}
 
 	const cerrarModalUsuario = () => {
 		setModalUsuarioOpen(false)
 		setUsuarioEditando(null)
+		// Limpiar el formulario al cerrar usando la función helper
+		setFormUsuario(crearFormularioVacio())
 	}
 
 	const guardarUsuario = async () => {
+		// Validar contraseña al crear
+		if (!usuarioEditando?.id && !formUsuario.password_hash?.trim()) {
+			mostrarMensaje('error', 'Error', 'La contraseña es obligatoria al crear un usuario')
+			return
+		}
+
 		setSaving(true)
 		try {
+			const usuarioData = { ...formUsuario }
+			
+			// Al editar, solo enviar password_hash si se proporcionó
 			if (usuarioEditando?.id) {
-				await updateUsuario(usuarioEditando.id, formUsuario)
+				if (!usuarioData.password_hash?.trim()) {
+					delete usuarioData.password_hash
+				}
+				await updateUsuario(usuarioEditando.id, usuarioData)
 				mostrarMensaje('success', 'Éxito', 'Usuario actualizado correctamente')
 			} else {
-				await createUsuario(formUsuario)
+				await createUsuario(usuarioData)
 				mostrarMensaje('success', 'Éxito', 'Usuario creado correctamente')
 			}
-			cerrarModalUsuario()
 			await cargarUsuarios()
+			cerrarModalUsuario()
 		} catch (error) {
 			mostrarMensaje(
 				'error',
@@ -681,6 +715,7 @@ export default function ConfiguracionPage() {
 
 			{/* MODAL USUARIO */}
 			<ModalInformation
+				key={usuarioEditando ? `edit-${usuarioEditando.id}` : `create-${modalKey}`}
 				open={modalUsuarioOpen}
 				onClose={cerrarModalUsuario}
 				titulo={usuarioEditando ? 'Editar Usuario' : 'Crear Usuario'}
@@ -709,11 +744,11 @@ export default function ConfiguracionPage() {
                     </Grid2>
 						<Grid2 size={{ xs: 12 }}>
                       <FormTextField
-								key="nombre_completo"
+								key={`nombre_completo-${modalKey}-${usuarioEditando?.id || 'new'}`}
 								label="Nombre Completo"
 								name="nombre_completo"
 								type="text"
-								value={formUsuario.nombre_completo}
+								value={formUsuario.nombre_completo || ''}
 								onchange={(e) =>
 									setFormUsuario({
 										...formUsuario,
@@ -721,19 +756,35 @@ export default function ConfiguracionPage() {
 									})
 								}
 								error={false}
+								autoComplete="off"
                       />
                     </Grid2>
                   <Grid2 size={{ xs: 12 }}>
                       <FormTextField
-								key="email"
+								key={`email-${modalKey}-${usuarioEditando?.id || 'new'}`}
 								label="Email"
 								name="email"
 								type="email"
-								value={formUsuario.email}
+								value={formUsuario.email || ''}
 								onchange={(e) =>
 									setFormUsuario({ ...formUsuario, email: e.target.value })
 								}
 								error={false}
+								autoComplete="off"
+                      />
+                      </Grid2>
+                  <Grid2 size={{ xs: 12 }}>
+                      <FormTextField
+								key={`password_hash-${modalKey}-${usuarioEditando?.id || 'new'}`}
+								label={usuarioEditando ? 'Contraseña (dejar vacío para no cambiar)' : 'Contraseña'}
+								name="password_hash"
+								type="password"
+								value={formUsuario.password_hash || ''}
+								onchange={(e) =>
+									setFormUsuario({ ...formUsuario, password_hash: e.target.value })
+								}
+								error={false}
+								autoComplete={usuarioEditando ? 'current-password' : 'new-password'}
                       />
                       </Grid2>
                   <Grid2 size={{ xs: 12 }}>

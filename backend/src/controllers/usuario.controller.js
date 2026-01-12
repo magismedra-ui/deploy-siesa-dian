@@ -88,12 +88,16 @@ const updateUser = async (req, res) => {
     if (email) user.email = email;
     if (rol_id) user.rol_id = rol_id;
     if (estado) user.estado = estado;
+    if (password_hash) user.password_hash = password_hash; // El hook beforeUpdate se encargará de hashear
 
     await user.save();
 
+    const userResponse = user.toJSON();
+    delete userResponse.password_hash;
+
     res.json({
       message: "Usuario actualizado exitosamente",
-      user: user,
+      user: userResponse,
     });
   } catch (error) {
     console.error("Error al actualizar usuario:", error);
