@@ -170,8 +170,15 @@ const calcularDuracionMinutos = (segundos, decimales = 2) => {
  */
 const initialize = async () => {
 	try {
-		// Verificar conexión
-		await redisConnection.ping();
+		// Intentar verificar conexión con timeout
+		// Si Redis no está disponible, no fallar el servidor
+		const pingPromise = redisConnection.ping();
+		const timeoutPromise = new Promise((_, reject) => 
+			setTimeout(() => reject(new Error('Timeout')), 2000)
+		);
+		
+		await Promise.race([pingPromise, timeoutPromise]);
+		
 		console.log(`[RedisLogger] Inicializado - Stream: ${STREAM_NAME}`);
 		if (RETENTION_DAYS) {
 			console.log(
@@ -184,7 +191,9 @@ const initialize = async () => {
 		}
 		return true;
 	} catch (error) {
-		console.error('[RedisLogger] Error inicializando:', error.message);
+		console.warn(
+			`[RedisLogger] Redis no disponible (logging deshabilitado): ${error.message}`
+		);
 		return false;
 	}
 };

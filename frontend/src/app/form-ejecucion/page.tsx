@@ -24,6 +24,8 @@ import {
 	Chip,
 	IconButton,
 	Checkbox,
+	LinearProgress,
+	LinearProgressProps,
 } from '@mui/material'
 import PauseIcon from '@mui/icons-material/Pause'
 import PlayArrowOutlinedIcon from '@mui/icons-material/PlayArrowOutlined'
@@ -40,6 +42,23 @@ import { DatePicker } from '@mui/x-date-pickers/DatePicker'
 import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider'
 import { AdapterDayjs } from '@mui/x-date-pickers/AdapterDayjs'
 import dayjs, { Dayjs } from 'dayjs'
+
+// Componente LinearProgress con label de porcentaje
+function LinearProgressWithLabel(props: LinearProgressProps & { value: number }) {
+	return (
+		<Box sx={{ display: 'flex', alignItems: 'center' }}>
+			<Box sx={{ width: '100%', mr: 1 }}>
+				<LinearProgress variant="determinate" {...props} />
+			</Box>
+			<Box sx={{ minWidth: 35 }}>
+				<Typography
+					variant="body2"
+					sx={{ color: 'text.secondary' }}
+				>{`${Math.round(props.value)}%`}</Typography>
+			</Box>
+		</Box>
+	)
+}
 
 export default function EjecucionPage() {
 	const [selectedFile, setSelectedFile] = useState<File | null>(null)
@@ -80,6 +99,17 @@ export default function EjecucionPage() {
 	const logsCountRef = useRef(0)
 	const logsMinutoRef = useRef<NodeJS.Timeout | null>(null)
 
+	// Estados para barra de progreso
+	const [procesoActivo, setProcesoActivo] = useState<'insercion' | 'conciliacion' | null>(null)
+	const [progresoVisible, setProgresoVisible] = useState(false)
+	const [mensajeProgreso, setMensajeProgreso] = useState('')
+	const [progresoPorcentaje, setProgresoPorcentaje] = useState(0)
+	const procesosActivosRef = useRef<Set<string>>(new Set())
+	const ultimoJobIdRef = useRef<string | null>(null)
+	const inicioProcesoRef = useRef<number | null>(null)
+	const totalRegistrosRef = useRef<number | null>(null)
+	const registrosProcesadosRef = useRef<number>(0)
+
 	const handleFileSelect = (field: string, value: File[]) => {
 		if (value && value.length > 0) {
 			const file = value[0]
@@ -111,8 +141,15 @@ export default function EjecucionPage() {
 		}
 
 		setUploading(true)
+		
 		try {
-			await uploadExcelFile(selectedFile)
+			const response = await uploadExcelFile(selectedFile)
+			// Si la respuesta incluye un jobId o ejecucionId, lo guardamos
+			if (response?.ejecucion_id) {
+				ultimoJobIdRef.current = String(response.ejecucion_id)
+				// Preparar para rastrear el proceso cuando lleguen los logs
+				procesosActivosRef.current.add(`insercion-${response.ejecucion_id}`)
+			}
 			mostrarMensaje('success', 'Éxito', 'Archivo subido correctamente')
 			setSelectedFile(null)
 		} catch (error) {
@@ -123,6 +160,7 @@ export default function EjecucionPage() {
 			)
 		} finally {
 			setUploading(false)
+			// La barra de progreso se activará cuando lleguen los logs del proceso en segundo plano
 		}
 	}
 
@@ -174,8 +212,10 @@ export default function EjecucionPage() {
 				schedulerEnabled,
 				cronExpressionn,
 			}
-			await configurarScheduler(data)
-			mostrarMensaje('success', 'Éxito', 'Configuración del scheduler guardada correctamente')
+		await configurarScheduler(data)
+		mostrarMensaje('success', 'Éxito', 'Configuración del scheduler guardada correctamente')
+		
+		// La barra de progreso se activará cuando lleguen los logs del proceso en segundo plano
 		} catch (error) {
 			mostrarMensaje(
 				'error',
@@ -186,6 +226,7 @@ export default function EjecucionPage() {
 			)
 		} finally {
 			setGuardandoScheduler(false)
+			// La barra de progreso se activará cuando lleguen los logs del proceso en segundo plano
 		}
 	}
 
@@ -198,6 +239,188 @@ export default function EjecucionPage() {
 		setMessageTitle(title)
 		setMessageText(text)
 		setModalMessage(true)
+	}
+
+	// Función para calcular porcentaje de progreso
+	const calcularProgreso = (proceso: 'insercion' | 'conciliacion') => {
+		if (proceso === 'insercion') {
+			// Para inserción, usar registros procesados
+			if (totalRegistrosRef.current && totalRegistrosRef.current > 0) {
+				const porcentaje = Math.min(100, (registrosProcesadosRef.current / totalRegistrosRef.current) * 100)
+				setProgresoPorcentaje(porcentaje)
+			} else if (inicioProcesoRef.current) {
+				// Si no tenemos total, usar tiempo transcurrido estimado (max 10 minutos)
+				const tiempoTranscurrido = Date.now() - inicioProcesoRef.current
+				const tiempoEstimado = 10 * 60 * 1000 // 10 minutos
+				const porcentaje = Math.min(95, (tiempoTranscurrido / tiempoEstimado) * 100)
+				setProgresoPorcentaje(porcentaje)
+			}
+		} else if (proceso === 'conciliacion') {
+			// Para conciliación, usar tiempo transcurrido estimado (max 5 minutos)
+			if (inicioProcesoRef.current) {
+				const tiempoTranscurrido = Date.now() - inicioProcesoRef.current
+				const tiempoEstimado = 5 * 60 * 1000 // 5 minutos
+				const porcentajeCalculado = Math.min(95, (tiempoTranscurrido / tiempoEstimado) * 100)
+				setProgresoPorcentaje(porcentajeCalculado)
+			}
+		}
+	}
+
+	// Función para detectar procesos activos basándose en los logs
+	const detectarProcesoActivo = (log: LogEntry) => {
+		const proceso = log.proceso?.toLowerCase()
+		const nivel = log.nivel?.toLowerCase()
+		const mensaje = log.mensaje?.toLowerCase() || ''
+		const mensajeOriginal = log.mensaje || ''
+		const jobId = log.jobId || ''
+
+		if (!proceso) return
+
+		// Proceso de inserción (excel-processing)
+		if (proceso === 'excel-processing') {
+			// Detectar inicio: cualquier log de info indica que el proceso está activo
+			if (nivel === 'info' && (mensaje.includes('procesados') || mensaje.includes('registros') || mensaje.includes('procesamiento'))) {
+				if (jobId) {
+					// Reemplazar cualquier jobId temporal con el real
+					const tempIds = Array.from(procesosActivosRef.current).filter(k => k.startsWith('insercion-') && !k.includes(`insercion-${jobId}`))
+					tempIds.forEach(id => procesosActivosRef.current.delete(id))
+					procesosActivosRef.current.add(`insercion-${jobId}`)
+				}
+				
+				// Inicializar tiempo de inicio si no está establecido
+				if (!inicioProcesoRef.current) {
+					inicioProcesoRef.current = log.timestamp
+				}
+				
+				setProcesoActivo('insercion')
+				setProgresoVisible(true)
+				
+				// Extraer número de registros procesados del mensaje
+				if (mensaje.includes('procesados')) {
+					const match = mensajeOriginal.match(/(\d+)\s+registros?\s+procesados?/i) || mensajeOriginal.match(/procesados?\s+(\d+)/i)
+					if (match && match[1]) {
+						const procesados = parseInt(match[1], 10)
+						registrosProcesadosRef.current = Math.max(registrosProcesadosRef.current, procesados)
+					}
+					setMensajeProgreso(`Inserción en curso: ${mensajeOriginal}`)
+				} else {
+					setMensajeProgreso('Procesando inserción de documentos en proc_documentos_staging...')
+				}
+				
+				calcularProgreso('insercion')
+			}
+			
+			// Detectar finalización: mensaje con "completado" o "procesamiento completado"
+			if ((nivel === 'info' || nivel === 'warn') && mensaje.includes('procesamiento completado')) {
+				if (jobId) {
+					procesosActivosRef.current.delete(`insercion-${jobId}`)
+				}
+				
+				// Extraer total de registros procesados del mensaje final
+				const match = mensajeOriginal.match(/total\s+procesados?[:\s]+(\d+)/i) || mensajeOriginal.match(/procesados?[:\s]+(\d+)/i)
+				if (match && match[1]) {
+					registrosProcesadosRef.current = parseInt(match[1], 10)
+					totalRegistrosRef.current = registrosProcesadosRef.current
+				}
+				
+				setProgresoPorcentaje(100)
+				
+				// Si no hay más procesos activos de inserción, ocultar barra
+				if (procesosActivosRef.current.size === 0 || !Array.from(procesosActivosRef.current).some(k => k.startsWith('insercion-'))) {
+					setTimeout(() => {
+						if (!Array.from(procesosActivosRef.current).some(k => k.startsWith('insercion-'))) {
+							setProcesoActivo(null)
+							setProgresoVisible(false)
+							setMensajeProgreso('')
+							setProgresoPorcentaje(0)
+							inicioProcesoRef.current = null
+							totalRegistrosRef.current = null
+							registrosProcesadosRef.current = 0
+						}
+					}, 1500)
+				}
+			}
+		}
+
+		// Proceso de conciliación (conciliacion-process o scheduled-conciliacion)
+		if (proceso === 'conciliacion-process' || proceso === 'scheduled-conciliacion' || proceso === 'conciliacion') {
+			// Detectar inicio: "consultando" o "iniciando" o "procesando"
+			if (nivel === 'info' && (mensaje.includes('consultando') || mensaje.includes('iniciando') || mensaje.includes('procesando') || mensaje.includes('ejecutando'))) {
+				if (jobId) {
+					// Reemplazar cualquier jobId temporal con el real
+					const tempIds = Array.from(procesosActivosRef.current).filter(k => k.startsWith('conciliacion-') && !k.includes(`conciliacion-${jobId}`))
+					tempIds.forEach(id => procesosActivosRef.current.delete(id))
+					procesosActivosRef.current.add(`conciliacion-${jobId}`)
+				}
+				
+				// Inicializar tiempo de inicio si no está establecido
+				if (!inicioProcesoRef.current) {
+					inicioProcesoRef.current = log.timestamp
+				}
+				
+				setProcesoActivo('conciliacion')
+				setProgresoVisible(true)
+				setMensajeProgreso('Ejecutando proceso de conciliación...')
+				
+				calcularProgreso('conciliacion')
+			}
+			
+			// Detectar finalización: mensaje con "conciliación completada" o "completada"
+			if (nivel === 'info' && mensaje.includes('conciliación completada')) {
+				if (jobId) {
+					procesosActivosRef.current.delete(`conciliacion-${jobId}`)
+				}
+				
+				setProgresoPorcentaje(100)
+				
+				// Si no hay más procesos activos de conciliación, ocultar barra
+				if (procesosActivosRef.current.size === 0 || !Array.from(procesosActivosRef.current).some(k => k.startsWith('conciliacion-'))) {
+					setTimeout(() => {
+						if (!Array.from(procesosActivosRef.current).some(k => k.startsWith('conciliacion-'))) {
+							setProcesoActivo(null)
+							setProgresoVisible(false)
+							setMensajeProgreso('')
+							setProgresoPorcentaje(0)
+							inicioProcesoRef.current = null
+						}
+					}, 1500)
+				}
+			}
+		}
+
+		// Detectar errores
+		if (nivel === 'error') {
+			if (proceso === 'excel-processing') {
+				if (jobId) {
+					procesosActivosRef.current.delete(`insercion-${jobId}`)
+				}
+				setTimeout(() => {
+					if (!Array.from(procesosActivosRef.current).some(k => k.startsWith('insercion-'))) {
+						setProcesoActivo(null)
+						setProgresoVisible(false)
+						setMensajeProgreso('')
+						setProgresoPorcentaje(0)
+						inicioProcesoRef.current = null
+						totalRegistrosRef.current = null
+						registrosProcesadosRef.current = 0
+					}
+				}, 2000)
+			}
+			if (proceso === 'conciliacion-process' || proceso === 'scheduled-conciliacion' || proceso === 'conciliacion') {
+				if (jobId) {
+					procesosActivosRef.current.delete(`conciliacion-${jobId}`)
+				}
+				setTimeout(() => {
+					if (!Array.from(procesosActivosRef.current).some(k => k.startsWith('conciliacion-'))) {
+						setProcesoActivo(null)
+						setProgresoVisible(false)
+						setMensajeProgreso('')
+						setProgresoPorcentaje(0)
+						inicioProcesoRef.current = null
+					}
+				}, 2000)
+			}
+		}
 	}
 
 	// ==================== LOGS HISTÓRICOS ====================
@@ -318,6 +541,9 @@ export default function EjecucionPage() {
 				const log: LogEntry = JSON.parse(logData)
 				console.log('SSE log parseado exitosamente:', log)
 				
+				// Detectar procesos activos según los logs
+				detectarProcesoActivo(log)
+				
 				setLogsTiempoReal((prev) => {
 					const nuevo = [...prev, log]
 					console.log('SSE - Total logs en tiempo real:', nuevo.length)
@@ -347,6 +573,10 @@ export default function EjecucionPage() {
 			try {
 				console.log('SSE evento "log" recibido:', event.data)
 				const log: LogEntry = JSON.parse(event.data)
+				
+				// Detectar procesos activos según los logs
+				detectarProcesoActivo(log)
+				
 				setLogsTiempoReal((prev) => [...prev, log])
 				logsCountRef.current += 1
 				
@@ -448,6 +678,88 @@ export default function EjecucionPage() {
 		// eslint-disable-next-line react-hooks/exhaustive-deps
 	}, [])
 
+	// Verificar procesos activos al montar y actualizar barra de progreso
+	useEffect(() => {
+		// Verificar si hay procesos activos basándose en los logs históricos recientes
+		const verificarProcesosActivos = () => {
+			// Revisar los últimos logs para detectar procesos activos
+			const logsRecientes = [...logsHistoricos, ...logsTiempoReal]
+				.sort((a, b) => b.timestamp - a.timestamp)
+				.slice(0, 100) // Últimos 100 logs para mejor detección
+
+			let procesoEncontrado: 'insercion' | 'conciliacion' | null = null
+			let logCompletadoEncontrado = false
+
+			for (const log of logsRecientes) {
+				const proceso = log.proceso?.toLowerCase()
+				const nivel = log.nivel?.toLowerCase()
+				const mensaje = log.mensaje?.toLowerCase() || ''
+				const timestamp = log.timestamp
+
+				if (!proceso) continue
+
+				// Verificar si el log es reciente (últimos 10 minutos)
+				const ahora = Date.now()
+				const tiempoTranscurrido = ahora - timestamp
+				const esReciente = tiempoTranscurrido < 10 * 60 * 1000 // 10 minutos
+
+				if (!esReciente) continue
+
+				// Detectar proceso de inserción activo
+				if (proceso === 'excel-processing') {
+					// Si encontramos un log de completado, verificar si es el último
+					if ((nivel === 'info' || nivel === 'warn') && mensaje.includes('procesamiento completado')) {
+						if (!logCompletadoEncontrado) {
+							logCompletadoEncontrado = true
+							// Si hay un log de completado reciente, no hay proceso activo
+							break
+						}
+					}
+					// Si hay logs de progreso recientes, el proceso está activo
+					if (nivel === 'info' && (mensaje.includes('procesados') || mensaje.includes('registros'))) {
+						procesoEncontrado = 'insercion'
+						// No romper, continuar verificando si hay completado después
+					}
+				}
+
+				// Detectar proceso de conciliación activo
+				if (proceso === 'conciliacion-process' || proceso === 'scheduled-conciliacion' || proceso === 'conciliacion') {
+					// Si encontramos un log de completado, verificar si es el último
+					if (nivel === 'info' && mensaje.includes('conciliación completada')) {
+						if (!logCompletadoEncontrado) {
+							logCompletadoEncontrado = true
+							// Si hay un log de completado reciente, no hay proceso activo
+							break
+						}
+					}
+					// Si hay logs de inicio o progreso recientes, el proceso está activo
+					if (nivel === 'info' && (mensaje.includes('consultando') || mensaje.includes('iniciando') || mensaje.includes('procesando') || mensaje.includes('ejecutando'))) {
+						procesoEncontrado = 'conciliacion'
+						// No romper, continuar verificando si hay completado después
+					}
+				}
+			}
+
+			// Solo establecer proceso activo si no encontramos un log de completado reciente
+			if (procesoEncontrado && !logCompletadoEncontrado) {
+				setProcesoActivo(procesoEncontrado)
+				setProgresoVisible(true)
+				setMensajeProgreso(
+					procesoEncontrado === 'insercion'
+						? 'Procesando inserción de documentos en proc_documentos_staging...'
+						: 'Ejecutando proceso de conciliación...'
+				)
+			}
+		}
+
+		// Esperar un poco para que los logs se carguen
+		const timer = setTimeout(() => {
+			verificarProcesosActivos()
+		}, 1500)
+
+		return () => clearTimeout(timer)
+	}, [logsHistoricos, logsTiempoReal])
+
 	// Auto-scroll en tabla histórica
 	useEffect(() => {
 		if (autoScrollHistoricos && historicosRef.current && logsHistoricos.length > 0) {
@@ -481,6 +793,19 @@ export default function EjecucionPage() {
 		// eslint-disable-next-line react-hooks/exhaustive-deps
 	}, [])
 
+	// Actualizar progreso periódicamente mientras hay procesos activos
+	useEffect(() => {
+		if (!progresoVisible || !procesoActivo || !inicioProcesoRef.current) return
+
+		const interval = setInterval(() => {
+			if (procesoActivo) {
+				calcularProgreso(procesoActivo)
+			}
+		}, 1000) // Actualizar cada segundo
+
+		return () => clearInterval(interval)
+	}, [progresoVisible, procesoActivo])
+
 	const toggleNivel = (nivel: string) => {
 		setNivelesSeleccionados((prev) =>
 			prev.includes(nivel)
@@ -513,9 +838,13 @@ export default function EjecucionPage() {
 		}
 	}
 
+	// Determinar si el formulario debe estar deshabilitado
+	const formularioDeshabilitado = progresoVisible && procesoActivo !== null
+
   return (
 		<Box sx={{ minHeight: '100vh', display: 'flex', flexDirection: 'column' }}>
 			<Encabezado formTitulo="Ejecución de Procesos" />
+
       <Container
         sx={{
           marginBottom: 4,
@@ -532,7 +861,7 @@ export default function EjecucionPage() {
 					<Grid2 size={{ xs: 12, md: 6 }}>
 						<Paper sx={{ padding: 3 }}>
 							<Typography variant="h6" sx={{ marginBottom: 2 }}>
-								Subir Documento Excel
+								1. Subir Documento Excel
 							</Typography>
 							<Box>
 								<input
@@ -544,19 +873,20 @@ export default function EjecucionPage() {
 											handleFileSelect('excelFile', [file])
 										}
 									}}
+									disabled={formularioDeshabilitado}
 									style={{ display: 'none' }}
 									id="excel-file-input"
 								/>
-								<label htmlFor="excel-file-input">
+								<label htmlFor="excel-file-input" style={{ pointerEvents: formularioDeshabilitado ? 'none' : 'auto', opacity: formularioDeshabilitado ? 0.6 : 1 }}>
 									<Paper
 										elevation={3}
 										sx={{
 											p: 3,
 											border: '2px dashed #ccc',
 											textAlign: 'center',
-											cursor: 'pointer',
+											cursor: formularioDeshabilitado ? 'not-allowed' : 'pointer',
 											'&:hover': {
-												backgroundColor: '#f5f5f5',
+												backgroundColor: formularioDeshabilitado ? 'transparent' : '#f5f5f5',
 											},
 										}}
 									>
@@ -586,7 +916,7 @@ export default function EjecucionPage() {
 										<Button
 											variant="contained"
 											onClick={handleUpload}
-											disabled={uploading}
+											disabled={uploading || formularioDeshabilitado}
 											sx={{
 												backgroundColor: '#004084',
 												'&:hover': {
@@ -613,9 +943,9 @@ export default function EjecucionPage() {
 					<Grid2 size={{ xs: 12, md: 6 }}>
 						<Paper sx={{ padding: 3 }}>
 							<Typography variant="h6" sx={{ marginBottom: 2 }}>
-								Configuración de Ejecución
+								2. Ejecutar Conciliación
 							</Typography>
-							<Box sx={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
+							<Box sx={{ display: 'flex', flexDirection: 'column', gap: 3, opacity: formularioDeshabilitado ? 0.6 : 1, pointerEvents: formularioDeshabilitado ? 'none' : 'auto' }}>
 								<FormControl fullWidth variant="filled">
 									<InputLabel>CONCILIACION</InputLabel>
 									<Select
@@ -636,6 +966,7 @@ export default function EjecucionPage() {
 												setSchedulerEnabled(null)
 											}
 										}}
+										disabled={formularioDeshabilitado}
 										label="CONCILIACION"
 										sx={{
 											'& .MuiFilledInput-root': {
@@ -659,6 +990,7 @@ export default function EjecucionPage() {
 										onChange={(e) => setTiempoEjecucion(e.target.value)}
 										placeholder="Ej: 30"
 										variant="filled"
+										disabled={formularioDeshabilitado}
 										sx={{
 											'& .MuiFilledInput-root': {
 												backgroundColor: '#ffffff00 !important',
@@ -684,6 +1016,7 @@ export default function EjecucionPage() {
 													e.target.value as 'segundos' | 'minutos' | 'horas'
 												)
 											}
+											disabled={formularioDeshabilitado}
 											label="Unidad"
 											sx={{
 												'& .MuiFilledInput-root': {
@@ -702,7 +1035,7 @@ export default function EjecucionPage() {
 								<Button
 									variant="contained"
 									onClick={handleGuardarScheduler}
-									disabled={guardandoScheduler || !tiempoEjecucion.trim()}
+									disabled={guardandoScheduler || !tiempoEjecucion.trim() || formularioDeshabilitado}
 									sx={{
 										backgroundColor: '#004084',
 										paddingX: 3,
@@ -728,6 +1061,24 @@ export default function EjecucionPage() {
 
 				{/* SECCIÓN DE LOGS */}
 				<Box sx={{ marginTop: 4 }}>
+					{/* Barra de progreso */}
+					{progresoVisible && (
+						<Box sx={{ marginBottom: 3 }}>
+							<Typography
+								variant="body2"
+								sx={{
+									color: 'text.secondary',
+									fontWeight: 500,
+									fontSize: '0.875rem',
+									mb: 1,
+								}}
+							>
+								{mensajeProgreso || 'Procesando...'}
+							</Typography>
+							<LinearProgressWithLabel value={progresoPorcentaje} />
+						</Box>
+					)}
+
 					{/* FILTROS */}
 					<Paper sx={{ padding: 3, marginBottom: 3 }}>
 						<Box

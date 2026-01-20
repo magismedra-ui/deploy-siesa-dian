@@ -228,3 +228,76 @@ exports.buscarDocumento = async (req, res) => {
     });
   }
 };
+
+// Obtener documentos staging con paginación y filtrado por estado
+exports.getDocumentosPorEstado = async (req, res) => {
+  try {
+    const page = parseInt(req.query.page) || 1;
+    const limit = parseInt(req.query.limit) || 10;
+    // Decodificar el estado en caso de que tenga espacios codificados
+    // Express ya decodifica automáticamente, pero por si acaso lo hacemos explícito
+    const estado = req.query.estado ? decodeURIComponent(String(req.query.estado)) : null;
+    const nit_proveedor = req.query.nit_proveedor; // Filtro exacto por NIT proveedor
+    const fecha_emision = req.query.fecha_emision; // Filtro exacto por fecha emisión
+    const offset = (page - 1) * limit;
+
+    // Validar que el estado esté presente
+    if (!estado) {
+      return res.status(400).json({
+        success: false,
+        error: "El parámetro estado es requerido",
+      });
+    }
+
+    // Construir condiciones de filtrado (búsqueda exacta)
+    const whereClause = {
+      estado: estado,
+    };
+    
+    // Agregar filtros opcionales con búsqueda exacta
+    if (nit_proveedor) {
+      whereClause.nit_proveedor = {
+        [Op.eq]: nit_proveedor, // Búsqueda exacta
+      };
+    }
+    if (fecha_emision) {
+      whereClause.fecha_emision = {
+        [Op.eq]: fecha_emision, // Búsqueda exacta por fecha
+      };
+    }
+
+    // Obtener documentos con paginación
+    const { count, rows: documentos } = await DocumentoStaging.findAndCountAll({
+      where: whereClause,
+      include: [
+        {
+          model: Ejecucion,
+          as: "ejecucion",
+          attributes: ["id", "estado", "fecha_inicio", "fecha_fin"],
+        },
+      ],
+      limit: limit,
+      offset: offset,
+      order: [["createdAt", "DESC"]],
+    });
+
+    const totalPages = Math.ceil(count / limit);
+
+    return res.status(200).json({
+      success: true,
+      data: documentos,
+      total: count,
+      page: page,
+      limit: limit,
+      totalPages: totalPages,
+      estado: estado,
+    });
+  } catch (error) {
+    console.error("Error obteniendo documentos por estado:", error);
+    return res.status(500).json({
+      success: false,
+      message: "Error al obtener los documentos",
+      error: error.message,
+    });
+  }
+};

@@ -7,9 +7,14 @@ interface ErrorResponse {
 	error?: string
 }
 
-export async function GET(request: NextRequest) {
+export async function PUT(
+	request: NextRequest,
+	{ params }: { params: Promise<{ id: string }> }
+) {
 	try {
 		const authHeader = request.headers.get('authorization')
+		const body = await request.json()
+		const { id } = await params
 		
 		if (!authHeader) {
 			return NextResponse.json(
@@ -18,7 +23,7 @@ export async function GET(request: NextRequest) {
 			)
 		}
 
-		const response = await httpClient.get('/api/v1/parametros', {
+		const response = await httpClient.put(`/api/v1/parametros/${id}`, body, {
 			headers: {
 				'Authorization': authHeader,
 			},
@@ -26,7 +31,7 @@ export async function GET(request: NextRequest) {
 
 		return NextResponse.json(response.data, { status: 200 })
 	} catch (error) {
-		console.error('Error en GET parametros:', error)
+		console.error('Error en PUT parametros:', error)
 		
 		if (isAxiosError(error)) {
 			const axiosError = error as AxiosError<ErrorResponse>
@@ -35,21 +40,24 @@ export async function GET(request: NextRequest) {
 				axiosError.response?.data?.message ||
 				axiosError.response?.data?.error ||
 				axiosError.message ||
-				'Error al obtener parámetros'
+				'Error al actualizar parámetro'
 			return NextResponse.json({ message }, { status })
 		}
 
 		return NextResponse.json(
-			{ message: 'Error desconocido al obtener parámetros' },
+			{ message: 'Error desconocido al actualizar parámetro' },
 			{ status: 500 }
 		)
 	}
 }
 
-export async function POST(request: NextRequest) {
+export async function DELETE(
+	request: NextRequest,
+	{ params }: { params: Promise<{ id: string }> }
+) {
 	try {
 		const authHeader = request.headers.get('authorization')
-		const body = await request.json()
+		const { id } = await params
 		
 		if (!authHeader) {
 			return NextResponse.json(
@@ -58,15 +66,15 @@ export async function POST(request: NextRequest) {
 			)
 		}
 
-		const response = await httpClient.post('/api/v1/parametros', body, {
+		await httpClient.delete(`/api/v1/parametros/${id}`, {
 			headers: {
 				'Authorization': authHeader,
 			},
 		})
 
-		return NextResponse.json(response.data, { status: 201 })
+		return NextResponse.json({ message: 'Parámetro eliminado correctamente' }, { status: 200 })
 	} catch (error) {
-		console.error('Error en POST parametros:', error)
+		console.error('Error en DELETE parametros:', error)
 		
 		if (isAxiosError(error)) {
 			const axiosError = error as AxiosError<ErrorResponse>
@@ -75,14 +83,13 @@ export async function POST(request: NextRequest) {
 				axiosError.response?.data?.message ||
 				axiosError.response?.data?.error ||
 				axiosError.message ||
-				'Error al crear parámetro'
+				'Error al eliminar parámetro'
 			return NextResponse.json({ message }, { status })
 		}
 
 		return NextResponse.json(
-			{ message: 'Error desconocido al crear parámetro' },
+			{ message: 'Error desconocido al eliminar parámetro' },
 			{ status: 500 }
 		)
 	}
 }
-

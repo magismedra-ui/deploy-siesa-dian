@@ -8,9 +8,9 @@ const Resultado = sequelize.define(
     tipo_resultado: {
       type: DataTypes.ENUM(
         "CONCILIADO",
-        "NO_EN_SIESA",
-        "NO_EN_DIAN",
-        "DIFERENCIA_VALOR"
+        "CONCILIADO CON DIFERENCIA",
+        "NO CONCILIADO SOLO EN SIESA",
+        "NO CONCILIADO SOLO EN DIAN"
       ),
       allowNull: false,
     },
@@ -20,6 +20,10 @@ const Resultado = sequelize.define(
     },
     num_factura: {
       type: DataTypes.STRING(50),
+      allowNull: false,
+    },
+    fecha_emision: {
+      type: DataTypes.DATEONLY,
       allowNull: false,
     },
     valor_dian: {
