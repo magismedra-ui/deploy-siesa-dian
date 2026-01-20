@@ -10,7 +10,14 @@ const DocumentoStaging = sequelize.define(
       allowNull: false,
     },
     estado: {
-      type: DataTypes.ENUM("PENDIENTE", "EMPAREJADO"),
+      type: DataTypes.ENUM(
+        "PENDIENTE",
+        "EMPAREJADO",
+        "CONCILIADO",
+        "CONCILIADO CON DIFERENCIA",
+        "NO CONCILIADO SOLO EN SIESA",
+        "NO CONCILIADO SOLO EN DIAN"
+      ),
       allowNull: false,
       defaultValue: "PENDIENTE",
     },

@@ -82,7 +82,9 @@ export const createParametro = async (parametro: Parametro): Promise<Parametro> 
  */
 export const updateParametro = async (id: number, parametro: Parametro): Promise<Parametro> => {
 	try {
-		const response = await clientHttpClient.put('/api/configuracion/parametros', { ...parametro, id })
+		// Remover el ID del objeto parametro antes de enviarlo (el ID va en la URL)
+		const { id: _, ...parametroSinId } = parametro
+		const response = await clientHttpClient.put(`/api/configuracion/parametros/${id}`, parametroSinId)
 		return response.data
 	} catch (error) {
 		if (isAxiosError(error)) {

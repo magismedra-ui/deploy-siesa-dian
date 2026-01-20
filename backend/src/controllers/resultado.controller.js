@@ -8,6 +8,7 @@ exports.createResultado = async (req, res) => {
       tipo_resultado,
       nit_proveedor,
       num_factura,
+      fecha_emision,
       valor_dian,
       valor_siesa,
       diferencia,
@@ -25,6 +26,7 @@ exports.createResultado = async (req, res) => {
       tipo_resultado,
       nit_proveedor,
       num_factura,
+      fecha_emision,
       valor_dian,
       valor_siesa,
       diferencia,
@@ -41,10 +43,36 @@ exports.createResultado = async (req, res) => {
   }
 };
 
-// Obtener todos los resultados
+// Obtener todos los resultados con paginación y filtrado
 exports.getResultados = async (req, res) => {
   try {
-    const resultados = await Resultado.findAll({
+    const { Op } = require("sequelize");
+    const page = parseInt(req.query.page) || 1;
+    const limit = parseInt(req.query.limit) || 10;
+    const estado = req.query.estado; // Filtro por estado (tipo_resultado)
+    const nit_proveedor = req.query.nit_proveedor; // Filtro exacto por NIT proveedor
+    const fecha_emision = req.query.fecha_emision; // Filtro exacto por fecha emisión
+    const offset = (page - 1) * limit;
+
+    // Construir condiciones de filtrado (búsqueda exacta)
+    const whereClause = {};
+    if (estado) {
+      whereClause.tipo_resultado = estado;
+    }
+    if (nit_proveedor) {
+      whereClause.nit_proveedor = {
+        [Op.eq]: nit_proveedor, // Búsqueda exacta
+      };
+    }
+    if (fecha_emision) {
+      whereClause.fecha_emision = {
+        [Op.eq]: fecha_emision, // Búsqueda exacta por fecha
+      };
+    }
+
+    // Obtener resultados con paginación
+    const { count, rows: resultados } = await Resultado.findAndCountAll({
+      where: whereClause,
       include: [
         {
           model: Ejecucion,
@@ -52,8 +80,21 @@ exports.getResultados = async (req, res) => {
           attributes: ["id", "estado", "fecha_inicio"],
         },
       ],
+      limit: limit,
+      offset: offset,
+      order: [["createdAt", "DESC"]],
     });
-    return res.status(200).json(resultados);
+
+    const totalPages = Math.ceil(count / limit);
+
+    return res.status(200).json({
+      success: true,
+      data: resultados,
+      total: count,
+      page: page,
+      limit: limit,
+      totalPages: totalPages,
+    });
   } catch (error) {
     console.error("Error obteniendo resultados:", error);
     return res
@@ -99,6 +140,7 @@ exports.updateResultado = async (req, res) => {
       tipo_resultado,
       nit_proveedor,
       num_factura,
+      fecha_emision,
       valor_dian,
       valor_siesa,
       diferencia,
@@ -122,6 +164,7 @@ exports.updateResultado = async (req, res) => {
     resultado.tipo_resultado = tipo_resultado || resultado.tipo_resultado;
     resultado.nit_proveedor = nit_proveedor || resultado.nit_proveedor;
     resultado.num_factura = num_factura || resultado.num_factura;
+    resultado.fecha_emision = fecha_emision || resultado.fecha_emision;
     resultado.valor_dian =
       valor_dian !== undefined ? valor_dian : resultado.valor_dian;
     resultado.valor_siesa =

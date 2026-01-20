@@ -10,16 +10,30 @@ const connection = new IORedis({
   port: process.env.REDIS_PORT || 6379,
   maxRetriesPerRequest: null,
   retryStrategy: function (times) {
+    // Detener reintentos inmediatamente en desarrollo si Redis no está disponible
+    if (process.env.NODE_ENV !== 'production') {
+      return null; // No reintentar en desarrollo
+    }
+    // En producción, limitar reintentos a 3 intentos
+    if (times > 3) {
+      return null;
+    }
     const delay = Math.min(times * 50, 2000);
     return delay;
   },
   lazyConnect: true, // No conectar inmediatamente al instanciar
+  enableOfflineQueue: false, // No encolar comandos cuando está offline
+  enableReadyCheck: false, // No verificar si está listo antes de enviar comandos
 });
 
 // Manejo de errores de conexión silenciosos para no tumbar el server en dev
 connection.on("error", (err) => {
+  // Silenciar errores de conexión en desarrollo
+  if (process.env.NODE_ENV !== 'production') {
+    return;
+  }
   console.warn(
-    "Redis connection failed (Queue system will be unavailable):",
+    "[Redis Integration] Redis connection failed (Queue system will be unavailable):",
     err.message
   );
 });

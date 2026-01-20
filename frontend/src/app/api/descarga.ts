@@ -13,6 +13,7 @@ export interface Resultado {
 	tipo_resultado: string
 	nit_proveedor: string
 	num_factura: string
+	fecha_emision?: string
 	valor_dian: number
 	valor_siesa: number
 	diferencia: number
@@ -35,7 +36,14 @@ export interface DocumentoStaging {
 	nit_proveedor: string
 	num_factura: string
 	fuente: 'DIAN' | 'SIESA'
-	payload_original: Record<string, any>
+	estado?: string
+	fecha_emision?: string
+	valor_total?: number | string
+	impuestos?: number | string
+	payload_original?: Record<string, any>
+	ejecucion_id?: number
+	createdAt?: string
+	updatedAt?: string
 	[key: string]: any
 }
 
@@ -47,16 +55,28 @@ export interface DocumentosStagingResponse {
 // ==================== RESULTADOS ====================
 
 /**
- * Obtiene los resultados con paginación
+ * Obtiene los resultados con paginación desde repo_resultados
  */
 export const getResultados = async (
 	page: number = 0,
-	limit: number = 10
+	limit: number = 10,
+	estado?: string,
+	nit_proveedor?: string,
+	fecha_emision?: string
 ): Promise<ResultadosResponse> => {
 	try {
 		const params = new URLSearchParams()
 		params.append('page', (page + 1).toString()) // Backend generalmente usa página base 1
 		params.append('limit', limit.toString())
+		if (estado) {
+			params.append('estado', estado)
+		}
+		if (nit_proveedor) {
+			params.append('nit_proveedor', nit_proveedor)
+		}
+		if (fecha_emision) {
+			params.append('fecha_emision', fecha_emision)
+		}
 
 		const response = await clientHttpClient.get(
 			`/api/descarga/resultados?${params.toString()}`
@@ -103,6 +123,82 @@ export const getResultados = async (
 			throw new Error(errorMessage)
 		}
 		throw new Error('Error desconocido al obtener resultados')
+	}
+}
+
+/**
+ * Transforma un Resultado de repo_resultados a DocumentoStaging para compatibilidad con la tabla
+ */
+const transformarResultadoADocumentoStaging = (resultado: Resultado): DocumentoStaging => {
+	// Determinar fuente basándose en qué valor está presente
+	// Si ambos están presentes, usar DIAN como predeterminado
+	const fuente = resultado.valor_dian && resultado.valor_siesa 
+		? 'DIAN' 
+		: resultado.valor_dian 
+			? 'DIAN' 
+			: 'SIESA'
+	
+	// Usar el valor mayor o el promedio si ambos están presentes
+	const valorTotal = resultado.valor_dian && resultado.valor_siesa
+		? Math.max(resultado.valor_dian, resultado.valor_siesa)
+		: resultado.valor_dian || resultado.valor_siesa || 0
+	
+	return {
+		id: resultado.id,
+		nit_proveedor: resultado.nit_proveedor,
+		num_factura: resultado.num_factura,
+		fuente: fuente as 'DIAN' | 'SIESA',
+		estado: resultado.tipo_resultado,
+		fecha_emision: resultado.fecha_emision || undefined,
+		valor_total: valorTotal,
+		impuestos: Math.abs(resultado.diferencia) || 0, // Mostrar diferencia como impuestos para visualización
+		ejecucion_id: resultado.ejecucion_id,
+		createdAt: resultado.createdAt,
+		updatedAt: resultado.updatedAt,
+		// Campos adicionales del resultado para mostrar en la tabla
+		valor_dian: resultado.valor_dian,
+		valor_siesa: resultado.valor_siesa,
+		diferencia: resultado.diferencia,
+		observacion: resultado.observacion,
+	}
+}
+
+/**
+ * Obtiene resultados de repo_resultados y los transforma a formato DocumentoStaging
+ */
+export const getResultadosComoDocumentosStaging = async (
+	estado: string,
+	page: number = 0,
+	limit: number = 10,
+	nit_proveedor?: string,
+	fecha_emision?: string
+): Promise<DocumentosStagingPorEstadoResponse> => {
+	try {
+		const resultadosResponse = await getResultados(page, limit, estado, nit_proveedor, fecha_emision)
+		
+		// Transformar resultados a formato DocumentoStaging
+		const documentosStaging = resultadosResponse.data.map(transformarResultadoADocumentoStaging)
+		
+		return {
+			data: documentosStaging,
+			total: resultadosResponse.total,
+			page: resultadosResponse.page,
+			limit: resultadosResponse.limit,
+			totalPages: resultadosResponse.totalPages,
+			estado,
+		}
+	} catch (error) {
+		console.error('Error en getResultadosComoDocumentosStaging:', error)
+		if (isAxiosError(error)) {
+			const axiosError = error as AxiosError<ErrorResponse>
+			const errorMessage =
+				axiosError.response?.data?.message ||
+				axiosError.response?.data?.error ||
+				axiosError.message ||
+				'Error al obtener resultados como documentos staging'
+			throw new Error(errorMessage)
+		}
+		throw new Error('Error desconocido al obtener resultados como documentos staging')
 	}
 }
 
@@ -221,5 +317,78 @@ export const buscarDocumentosStaging = async (
 			throw new Error(errorMessage)
 		}
 		throw new Error('Error desconocido al buscar documentos staging')
+	}
+}
+
+// ==================== DOCUMENTOS STAGING POR ESTADO ====================
+
+export interface DocumentosStagingPorEstadoResponse {
+	data: DocumentoStaging[]
+	total: number
+	page: number
+	limit: number
+	totalPages: number
+	estado: string
+}
+
+/**
+ * Obtiene documentos staging filtrados por estado con paginación
+ */
+export const getDocumentosStagingPorEstado = async (
+	estado: string,
+	page: number = 0,
+	limit: number = 10,
+	nit_proveedor?: string,
+	fecha_emision?: string
+): Promise<DocumentosStagingPorEstadoResponse> => {
+	try {
+		const params = new URLSearchParams()
+		params.append('page', (page + 1).toString()) // Backend generalmente usa página base 1
+		params.append('limit', limit.toString())
+		params.append('estado', estado)
+		if (nit_proveedor) {
+			params.append('nit_proveedor', nit_proveedor)
+		}
+		if (fecha_emision) {
+			params.append('fecha_emision', fecha_emision)
+		}
+
+		const response = await clientHttpClient.get(
+			`/api/descarga/documentos-staging/por-estado?${params.toString()}`
+		)
+		
+		// Si la respuesta tiene la estructura esperada, retornarla directamente
+		if (response.data && (response.data.data || Array.isArray(response.data))) {
+			return {
+				data: response.data.data || response.data,
+				total: response.data.total || (Array.isArray(response.data) ? response.data.length : 0),
+				page: response.data.page !== undefined ? response.data.page - 1 : page, // Convertir a base 0
+				limit: response.data.limit || limit,
+				totalPages: response.data.totalPages || Math.ceil((response.data.total || response.data.length || 0) / (response.data.limit || limit)),
+				estado: response.data.estado || estado,
+			}
+		}
+
+		// Fallback: retornar estructura vacía
+		return {
+			data: [],
+			total: 0,
+			page,
+			limit,
+			totalPages: 0,
+			estado,
+		}
+	} catch (error) {
+		console.error('Error en getDocumentosStagingPorEstado:', error)
+		if (isAxiosError(error)) {
+			const axiosError = error as AxiosError<ErrorResponse>
+			const errorMessage =
+				axiosError.response?.data?.message ||
+				axiosError.response?.data?.error ||
+				axiosError.message ||
+				'Error al obtener documentos staging por estado'
+			throw new Error(errorMessage)
+		}
+		throw new Error('Error desconocido al obtener documentos staging por estado')
 	}
 }

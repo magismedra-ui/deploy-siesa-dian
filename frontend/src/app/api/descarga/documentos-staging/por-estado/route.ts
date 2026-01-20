@@ -8,11 +8,21 @@ interface ErrorResponse {
 }
 
 export async function GET(request: NextRequest) {
+	console.log('[por-estado route] GET request recibida')
 	try {
 		const searchParams = request.nextUrl.searchParams
 		const page = searchParams.get('page') || '1'
 		const limit = searchParams.get('limit') || '10'
-		const estado = searchParams.get('estado') // Filtro por estado
+		const estado = searchParams.get('estado')
+		
+		console.log('[por-estado route] Parámetros:', { page, limit, estado })
+
+		if (!estado) {
+			return NextResponse.json(
+				{ message: 'El parámetro estado es requerido' },
+				{ status: 400 }
+			)
+		}
 
 		// Obtener el token del header Authorization
 		const authHeader = request.headers.get('authorization')
@@ -27,12 +37,10 @@ export async function GET(request: NextRequest) {
 		const params = new URLSearchParams()
 		params.append('page', page)
 		params.append('limit', limit)
-		if (estado) {
-			params.append('estado', estado)
-		}
+		params.append('estado', estado)
 
 		// Hacer la petición al backend
-		const response = await httpClient.get(`/api/v1/resultados?${params.toString()}`, {
+		const response = await httpClient.get(`/api/v1/documentos-staging/por-estado?${params.toString()}`, {
 			headers: {
 				'Authorization': authHeader,
 			},
@@ -40,7 +48,7 @@ export async function GET(request: NextRequest) {
 
 		return NextResponse.json(response.data, { status: 200 })
 	} catch (error) {
-		console.error('Error en resultados API route:', error)
+		console.error('Error en documentos-staging por-estado API route:', error)
 
 		if (isAxiosError(error)) {
 			const axiosError = error as AxiosError<ErrorResponse>
@@ -49,13 +57,13 @@ export async function GET(request: NextRequest) {
 				axiosError.response?.data?.message ||
 				axiosError.response?.data?.error ||
 				axiosError.message ||
-				'Error al obtener resultados'
+				'Error al obtener documentos staging por estado'
 
 			return NextResponse.json({ message }, { status })
 		}
 
 		return NextResponse.json(
-			{ message: 'Error desconocido al obtener resultados' },
+			{ message: 'Error desconocido al obtener documentos staging por estado' },
 			{ status: 500 }
 		)
 	}
