@@ -24,12 +24,6 @@ const Encabezado = ({ formTitulo = '', ruta= '' }) => {
         const checkAuth = () => {
             const isAuth = isAuthenticated();
             const nombre = getUserNombre();
-            console.log('Encabezado - Verificando autenticación:', { 
-                isAuth, 
-                nombre,
-                token: localStorage.getItem('auth_token') ? 'existe' : 'no existe',
-                userNombre: localStorage.getItem('user_nombre')
-            });
             setAuthenticated(isAuth);
             setUserNombre(nombre);
         };
@@ -51,11 +45,6 @@ const Encabezado = ({ formTitulo = '', ruta= '' }) => {
         
         // Escuchar evento personalizado de cambio de autenticación
         const handleAuthChange = (event: Event) => {
-            const customEvent = event as CustomEvent
-            console.log('Encabezado - Evento authChange recibido', {
-                detail: customEvent.detail,
-                timestamp: new Date().toISOString()
-            })
             // Verificar inmediatamente después de un pequeño delay para asegurar que localStorage se actualizó
             setTimeout(() => {
                 checkAuth()
@@ -66,9 +55,6 @@ const Encabezado = ({ formTitulo = '', ruta= '' }) => {
         // Escuchar cambios en localStorage (para cambios desde otras pestañas)
         const handleStorageChange = (event: StorageEvent) => {
             if (event.key === 'auth_token' || event.key === 'user_nombre' || event.key === 'user_rol') {
-                console.log('Encabezado - Cambio en localStorage detectado (otra pestaña)', {
-                    key: event.key
-                })
                 setTimeout(() => {
                     checkAuth()
                 }, 100)

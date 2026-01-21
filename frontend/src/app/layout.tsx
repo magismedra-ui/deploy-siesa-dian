@@ -22,7 +22,7 @@ export default function RootLayout({
     <html lang="en">
       <meta name="viewport" content="initial-scale=1, width=device-width" />
       <head>
-        <title>RussellForms</title>
+        <title>12DForms</title>
       </head>
 
       <body >

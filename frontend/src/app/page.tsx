@@ -54,11 +54,6 @@ export default function LandingFlow() {
 		const checkAuth = () => {
 			setIsLoading(true)
 			const authenticated = isAuthenticated()
-			console.log('page.tsx - Verificando autenticación al cargar:', {
-				isAuthenticated: authenticated,
-				nombre: getUserNombre(),
-				token: getToken() ? 'existe' : 'no existe'
-			})
 			if (authenticated) {
 				setIsLoggedIn(true)
 			}
@@ -84,20 +79,9 @@ export default function LandingFlow() {
 				return
 			}
 
-			console.log('handleLogin - Iniciando proceso de login')
 			const token = await login({ email, password })
-			console.log('handleLogin - Token obtenido:', token ? 'Token presente' : 'Token ausente')
-			
 			saveToken(token)
-			console.log('handleLogin - Token guardado en localStorage')
-			
 			const decoded = decodeToken(token)
-			console.log('handleLogin - Usuario autenticado:', {
-				id: decoded.id,
-				email: decoded.email,
-				nombre: decoded.nombre,
-				rol: decoded.rol,
-			})
 
 			// Esperar un momento para asegurar que el evento se haya disparado
 			await new Promise(resolve => setTimeout(resolve, 100))

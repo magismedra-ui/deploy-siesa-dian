@@ -94,12 +94,6 @@ function RegistroDinamico<T extends { id?: number }>({
     }
     // Intentar validar con Formik, pero no bloquear si hay errores en otros campos
     await formikInstance.validateField(nombreCampoFormik);
-    const formikErrors = formikInstance.errors[nombreCampoFormik];
-    console.log("Errores de Formik para pContactoRegistros:", formikErrors);
-    console.log(
-      "Estado actual de pContactoRegistros:",
-      formikInstance.values[nombreCampoFormik]
-    );
 
     // Si no hay errores locales, proceder a agregar el registro
     setRegistroError(null);
@@ -107,10 +101,8 @@ function RegistroDinamico<T extends { id?: number }>({
     setTouched(false);
 
     const nuevoRegistro = crearRegistro(formData as T);
-    //console.log("Nuevo registro creado:", nuevoRegistro);
     const registros = [...registrosActuales, nuevoRegistro];
     formikInstance.setFieldValue(nombreCampoFormik, registros);
-    //console.log("Registros actualizados:", registros);
     setFormData({});
   };
 
@@ -133,15 +125,6 @@ function RegistroDinamico<T extends { id?: number }>({
       : null;
 
   useEffect(() => {
-    console.log(
-      "Estado de pContactoRegistros:",
-      formikInstance.values[nombreCampoFormik]
-    );
-    console.log("Errores de Formik:", formikInstance.errors[nombreCampoFormik]);
-    console.log(
-      "Touched de Formik:",
-      formikInstance.touched[nombreCampoFormik]
-    );
   }, [
     nombreCampoFormik,
     formikInstance.values,

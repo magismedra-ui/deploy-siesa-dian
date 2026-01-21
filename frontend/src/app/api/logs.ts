@@ -72,17 +72,11 @@ export const getLogs = async (filters: LogsFilters = {}): Promise<LogEntry[]> =>
 			throw new Error('No hay token de autenticación disponible')
 		}
 
-		console.log('getLogs - URL:', url)
-		console.log('getLogs - Token presente:', !!tokenToUse)
-		console.log('getLogs - Filtros:', filters)
-
 		const response = await clientHttpClient.get<LogEntry[] | ErrorResponse>(url, {
 			validateStatus: function (status) {
 				return status < 500 // No lanzar error para códigos 4xx, solo para 5xx
 			},
 		})
-
-		console.log('getLogs - Response status:', response.status)
 
 		// Si hay un error de autenticación o autorización
 		if (response.status === 401 || response.status === 403) {
@@ -99,9 +93,6 @@ export const getLogs = async (filters: LogsFilters = {}): Promise<LogEntry[]> =>
 			throw new Error(errorMsg)
 		}
 
-		console.log('getLogs - Response status:', response.status)
-		console.log('getLogs - Response data:', response.data)
-
 		// Verificar que la respuesta sea un array
 		const responseData = response.data as LogEntry[] | ErrorResponse
 		if (Array.isArray(responseData)) {
@@ -110,13 +101,11 @@ export const getLogs = async (filters: LogsFilters = {}): Promise<LogEntry[]> =>
 		
 		// Si la respuesta tiene estructura { success, count, logs: [] }
 		if (responseData && typeof responseData === 'object' && 'logs' in responseData && Array.isArray((responseData as any).logs)) {
-			console.log('getLogs - Extrayendo logs del objeto response:', (responseData as any).logs.length, 'logs encontrados')
 			return (responseData as any).logs
 		}
 		
 		// Si la respuesta tiene estructura { data: [] }
 		if (responseData && typeof responseData === 'object' && 'data' in responseData && Array.isArray((responseData as any).data)) {
-			console.log('getLogs - Extrayendo logs de response.data:', (responseData as any).data.length, 'logs encontrados')
 			return (responseData as any).data
 		}
 		
@@ -124,8 +113,6 @@ export const getLogs = async (filters: LogsFilters = {}): Promise<LogEntry[]> =>
 		console.warn('Respuesta de logs no es un array ni tiene estructura esperada:', responseData)
 		return []
 	} catch (error) {
-		console.error('getLogs - Error completo:', error)
-		
 		if (isAxiosError(error)) {
 			const axiosError = error as AxiosError<ErrorResponse>
 			const errorMessage =
@@ -134,24 +121,16 @@ export const getLogs = async (filters: LogsFilters = {}): Promise<LogEntry[]> =>
 				axiosError.message ||
 				'Error al obtener logs históricos'
 			
-			console.error('getLogs - Error axios:', {
-				status: axiosError.response?.status,
-				statusText: axiosError.response?.statusText,
-				data: axiosError.response?.data,
-				message: errorMessage,
-			})
-			
 			throw new Error(errorMessage)
 		}
 		
 		// Si es un Error estándar, pasar el mensaje
 		if (error instanceof Error) {
-			console.error('getLogs - Error estándar:', error.message)
 			throw error
 		}
 		
 		// Error desconocido
-		console.error('getLogs - Error desconocido:', error)
+		console.error('Error desconocido al obtener logs:', error)
 		throw new Error(`Error desconocido al obtener logs históricos: ${String(error)}`)
 	}
 }

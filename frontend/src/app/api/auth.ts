@@ -32,35 +32,20 @@ export interface DecodedToken {
  */
 export const login = async (credentials: LoginRequest): Promise<string> => {
 	try {
-		console.log('login - Iniciando login con:', { email: credentials.email })
 		// Usar la ruta API de Next.js como proxy para evitar problemas de CORS
 		const response = await clientHttpClient.post<LoginResponse>(
 			'/api/auth/login',
 			credentials
 		)
 
-		console.log('login - Respuesta recibida:', { 
-			status: response.status,
-			hasToken: !!response.data?.token,
-			message: response.data?.message,
-			responseData: response.data
-		})
-
 		if (!response.data?.token) {
-			console.error('login - Token no presente en la respuesta:', response.data)
 			throw new Error('Token no recibido del servidor')
 		}
 
 		return response.data.token
 	} catch (error) {
-		console.error('login - Error completo:', error)
 		if (isAxiosError(error)) {
 			const axiosError = error as AxiosError<ErrorResponse>
-			console.error('login - Error Axios:', {
-				status: axiosError.response?.status,
-				data: axiosError.response?.data,
-				message: axiosError.message
-			})
 			const errorMessage =
 				axiosError.response?.data?.message ||
 				axiosError.response?.data?.error ||
@@ -83,8 +68,6 @@ export const saveToken = (token: string): void => {
 			throw new Error('Token inválido')
 		}
 
-		console.log('saveToken - Token recibido:', token.substring(0, 20) + '...')
-		
 		// Limpiar datos antiguos primero
 		localStorage.removeItem('auth_token')
 		localStorage.removeItem('token_expiration')
@@ -92,20 +75,8 @@ export const saveToken = (token: string): void => {
 		localStorage.removeItem('user_rol')
 		
 		const decoded = decodeToken(token)
-		console.log('saveToken - Token decodificado:', { 
-			id: decoded.id, 
-			email: decoded.email, 
-			nombre: decoded.nombre, 
-			rol: decoded.rol,
-			exp: decoded.exp 
-		})
-		
 		const nombre = decoded.nombre || ''
 		const rol = decoded.rol || ''
-		
-		if (!nombre) {
-			console.warn('saveToken - Advertencia: El token no contiene nombre. Decodificado:', decoded)
-		}
 		
 		if (decoded.exp) {
 			const expirationTime = decoded.exp * 1000 // Convertir a milisegundos
@@ -120,15 +91,6 @@ export const saveToken = (token: string): void => {
 			localStorage.setItem('user_rol', rol)
 		}
 		
-		// Verificar que se guardó correctamente
-		const savedToken = localStorage.getItem('auth_token')
-		const savedNombre = localStorage.getItem('user_nombre')
-		console.log('saveToken - Verificación post-guardado:', {
-			token: savedToken ? 'existe (' + savedToken.length + ' caracteres)' : 'no existe',
-			nombre: savedNombre || 'vacío',
-			rol: localStorage.getItem('user_rol') || 'vacío'
-		})
-		
 		// Disparar evento personalizado para notificar cambio de autenticación
 		if (typeof window !== 'undefined') {
 			// Usar un pequeño delay para asegurar que localStorage se actualizó
@@ -136,7 +98,6 @@ export const saveToken = (token: string): void => {
 				const event = new CustomEvent('authChange', { 
 					detail: { authenticated: true, nombre, rol } 
 				})
-				console.log('saveToken - Disparando evento authChange con delay', { nombre, rol })
 				window.dispatchEvent(event)
 			}, 50)
 		}
@@ -179,14 +140,6 @@ export const decodeToken = (token: string): DecodedToken => {
 		)
 
 		const decoded = JSON.parse(jsonPayload)
-		console.log('decodeToken - Token decodificado exitosamente:', {
-			hasId: !!decoded.id,
-			hasEmail: !!decoded.email,
-			hasNombre: !!decoded.nombre,
-			hasRol: !!decoded.rol,
-			nombre: decoded.nombre,
-			rol: decoded.rol
-		})
 
 		return decoded as DecodedToken
 	} catch (error) {
@@ -326,10 +279,6 @@ export const validateAndCleanToken = (): void => {
 			if (decoded.nombre) {
 				const savedNombre = localStorage.getItem('user_nombre')
 				if (savedNombre !== decoded.nombre) {
-					console.log('validateAndCleanToken - Actualizando nombre en localStorage:', {
-						anterior: savedNombre,
-						nuevo: decoded.nombre
-					})
 					localStorage.setItem('user_nombre', decoded.nombre)
 					if (decoded.rol) {
 						localStorage.setItem('user_rol', decoded.rol)

@@ -451,9 +451,7 @@ export default function EjecucionPage() {
 				filters.duracionMax = parseInt(duracionMax)
 			}
 
-			console.log('Cargando logs con filtros:', filters)
 			const logs = await getLogs(filters)
-			console.log('Logs recibidos:', logs)
 			setLogsHistoricos(Array.isArray(logs) ? logs : [])
 		} catch (error) {
 			console.error('Error al cargar logs:', error)
@@ -499,8 +497,6 @@ export default function EjecucionPage() {
 		const separator = queryString ? '&' : '?'
 		const url = `/api/logs/stream${queryString ? `?${queryString}` : ''}${separator}token=${token}`
 
-		console.log('Conectando SSE a:', url)
-		
 		// Nota: EventSource no soporta headers personalizados, necesitamos pasar el token en la URL
 		const eventSource = new EventSource(url, {
 			withCredentials: false,
@@ -510,26 +506,14 @@ export default function EjecucionPage() {
 			setSseConnected(true)
 			setSseError(false)
 			setSseErrorMessage('')
-			console.log('SSE conectado exitosamente a:', url)
-			console.log('SSE readyState:', eventSource.readyState) // 0 = CONNECTING, 1 = OPEN, 2 = CLOSED
 		}
-		
-		// Listener adicional para debug
-		eventSource.addEventListener('open', () => {
-			console.log('SSE evento "open" recibido')
-		})
 
 		eventSource.onmessage = (event) => {
 			if (ssePaused) {
-				console.log('SSE pausado, ignorando mensaje')
 				return
 			}
 
 			try {
-				console.log('SSE mensaje recibido - tipo:', event.type)
-				console.log('SSE mensaje recibido - data:', event.data)
-				console.log('SSE mensaje recibido - lastEventId:', event.lastEventId)
-				
 				// Intentar parsear como JSON
 				let logData = event.data
 				
@@ -539,15 +523,12 @@ export default function EjecucionPage() {
 				}
 				
 				const log: LogEntry = JSON.parse(logData)
-				console.log('SSE log parseado exitosamente:', log)
 				
 				// Detectar procesos activos según los logs
 				detectarProcesoActivo(log)
 				
 				setLogsTiempoReal((prev) => {
-					const nuevo = [...prev, log]
-					console.log('SSE - Total logs en tiempo real:', nuevo.length)
-					return nuevo
+					return [...prev, log]
 				})
 				
 				logsCountRef.current += 1
@@ -571,7 +552,6 @@ export default function EjecucionPage() {
 			if (ssePaused) return
 			
 			try {
-				console.log('SSE evento "log" recibido:', event.data)
 				const log: LogEntry = JSON.parse(event.data)
 				
 				// Detectar procesos activos según los logs
@@ -593,10 +573,6 @@ export default function EjecucionPage() {
 		})
 
 		eventSource.onerror = (error) => {
-			console.error('Error SSE:', error)
-			console.error('SSE readyState:', eventSource.readyState)
-			console.error('SSE URL:', eventSource.url)
-			
 			// Solo cerrar y reconectar si realmente está cerrado
 			if (eventSource.readyState === EventSource.CLOSED) {
 				setSseConnected(false)
@@ -607,13 +583,11 @@ export default function EjecucionPage() {
 				// Intentar reconectar después de 3 segundos
 				setTimeout(() => {
 					if (!ssePaused) {
-						console.log('SSE - Intentando reconectar...')
 						setSseErrorMessage('Reconectando...')
 						conectarSSE()
 					}
 				}, 3000)
 			} else if (eventSource.readyState === EventSource.CONNECTING) {
-				console.log('SSE - Reconectando...')
 				setSseError(true)
 				setSseErrorMessage('Reconectando...')
 			} else {
