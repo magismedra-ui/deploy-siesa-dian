@@ -1,6 +1,6 @@
 const DocumentoStaging = require("../database/models/DocumentoStaging");
 const Ejecucion = require("../database/models/Ejecucion");
-const { Op } = require("sequelize");
+const { Op, Sequelize } = require("sequelize");
 
 // Crear un nuevo documento staging
 exports.createDocumento = async (req, res) => {
@@ -250,23 +250,42 @@ exports.getDocumentosPorEstado = async (req, res) => {
     }
 
     // Construir condiciones de filtrado (búsqueda exacta)
-    const whereClause = {
-      estado: estado,
-    };
+    const whereConditions = [
+      { estado: estado }
+    ];
     
     // Agregar filtros opcionales con búsqueda exacta
     if (nit_proveedor) {
-      whereClause.nit_proveedor = {
-        [Op.eq]: nit_proveedor, // Búsqueda exacta
-      };
+      whereConditions.push({
+        nit_proveedor: { [Op.eq]: nit_proveedor }
+      });
     }
+    
     if (fecha_emision) {
-      whereClause.fecha_emision = {
-        [Op.eq]: fecha_emision, // Búsqueda exacta por fecha
-      };
+      // Asegurar que la fecha esté en formato YYYY-MM-DD
+      // Validar que tenga el formato correcto (10 caracteres: YYYY-MM-DD)
+      const fechaFormat = fecha_emision.trim();
+      if (fechaFormat.match(/^\d{4}-\d{2}-\d{2}$/)) {
+        // El campo fecha_emision es DATE en MySQL y DATEONLY en Sequelize
+        // Se almacena como 'YYYY-MM-DD' sin componente de hora
+        // Usar comparación directa sin DATE() ya que el campo ya es DATE
+        whereConditions.push(
+          Sequelize.literal(`fecha_emision = '${fechaFormat}'`)
+        );
+      } else {
+        console.error('[DocumentosStaging] Formato de fecha inválido:', fechaFormat);
+        return res.status(400).json({
+          success: false,
+          error: `Formato de fecha inválido. Se espera YYYY-MM-DD, se recibió: ${fechaFormat}`,
+        });
+      }
     }
-
-    // Obtener documentos con paginación
+    
+    // Construir el whereClause final usando Op.and si hay múltiples condiciones
+    const whereClause = whereConditions.length > 1 
+      ? { [Op.and]: whereConditions }
+      : whereConditions[0];
+    
     const { count, rows: documentos } = await DocumentoStaging.findAndCountAll({
       where: whereClause,
       include: [

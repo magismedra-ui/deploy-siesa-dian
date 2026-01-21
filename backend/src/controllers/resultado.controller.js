@@ -1,5 +1,6 @@
 const Resultado = require("../database/models/Resultado");
 const Ejecucion = require("../database/models/Ejecucion");
+const { Op, Sequelize } = require("sequelize");
 
 // Crear un nuevo resultado
 exports.createResultado = async (req, res) => {
@@ -55,20 +56,42 @@ exports.getResultados = async (req, res) => {
     const offset = (page - 1) * limit;
 
     // Construir condiciones de filtrado (búsqueda exacta)
-    const whereClause = {};
+    const { Sequelize } = require("sequelize");
+    const whereConditions = [];
+    
     if (estado) {
-      whereClause.tipo_resultado = estado;
+      whereConditions.push({ tipo_resultado: estado });
     }
+    
     if (nit_proveedor) {
-      whereClause.nit_proveedor = {
-        [Op.eq]: nit_proveedor, // Búsqueda exacta
-      };
+      whereConditions.push({
+        nit_proveedor: { [Op.eq]: nit_proveedor }
+      });
     }
+    
     if (fecha_emision) {
-      whereClause.fecha_emision = {
-        [Op.eq]: fecha_emision, // Búsqueda exacta por fecha
-      };
+      // Asegurar que la fecha esté en formato YYYY-MM-DD
+      // Validar que tenga el formato correcto (10 caracteres: YYYY-MM-DD)
+      const fechaFormat = fecha_emision.trim();
+      if (fechaFormat.match(/^\d{4}-\d{2}-\d{2}$/)) {
+        // El campo fecha_emision es DATE en MySQL y DATEONLY en Sequelize
+        // Se almacena como 'YYYY-MM-DD' sin componente de hora
+        // Usar comparación directa sin DATE() ya que el campo ya es DATE
+        whereConditions.push(
+          Sequelize.literal(`fecha_emision = '${fechaFormat}'`)
+        );
+      } else {
+        return res.status(400).json({
+          success: false,
+          error: `Formato de fecha inválido. Se espera YYYY-MM-DD, se recibió: ${fechaFormat}`,
+        });
+      }
     }
+    
+    // Construir el whereClause final usando Op.and si hay múltiples condiciones
+    const whereClause = whereConditions.length > 1 
+      ? { [Op.and]: whereConditions }
+      : (whereConditions.length === 1 ? whereConditions[0] : {});
 
     // Obtener resultados con paginación
     const { count, rows: resultados } = await Resultado.findAndCountAll({

@@ -220,8 +220,6 @@ export const buscarDocumentosStaging = async (
 			`/api/descarga/documentos-staging/buscar?${params.toString()}`
 		)
 		
-		console.log('Respuesta completa de documentos-staging:', response.data)
-		
 		const data = response.data
 		
 		// Si la respuesta tiene la estructura { success, total, documentos: [...] }
@@ -239,8 +237,6 @@ export const buscarDocumentosStaging = async (
 				doc.FUENTE === 'SIESA' || 
 				doc.FUENTE === 'siesa'
 			)
-			
-			console.log('Documentos encontrados - DIAN:', dianDoc, 'SIESA:', siesaDoc)
 			
 			return {
 				dian: dianDoc || undefined,
@@ -359,7 +355,7 @@ export const getDocumentosStagingPorEstado = async (
 		
 		// Si la respuesta tiene la estructura esperada, retornarla directamente
 		if (response.data && (response.data.data || Array.isArray(response.data))) {
-			return {
+			const result = {
 				data: response.data.data || response.data,
 				total: response.data.total || (Array.isArray(response.data) ? response.data.length : 0),
 				page: response.data.page !== undefined ? response.data.page - 1 : page, // Convertir a base 0
@@ -367,6 +363,7 @@ export const getDocumentosStagingPorEstado = async (
 				totalPages: response.data.totalPages || Math.ceil((response.data.total || response.data.length || 0) / (response.data.limit || limit)),
 				estado: response.data.estado || estado,
 			}
+			return result
 		}
 
 		// Fallback: retornar estructura vacía

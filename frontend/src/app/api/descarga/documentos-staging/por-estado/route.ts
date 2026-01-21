@@ -8,14 +8,13 @@ interface ErrorResponse {
 }
 
 export async function GET(request: NextRequest) {
-	console.log('[por-estado route] GET request recibida')
 	try {
 		const searchParams = request.nextUrl.searchParams
 		const page = searchParams.get('page') || '1'
 		const limit = searchParams.get('limit') || '10'
 		const estado = searchParams.get('estado')
-		
-		console.log('[por-estado route] Parámetros:', { page, limit, estado })
+		const nit_proveedor = searchParams.get('nit_proveedor')
+		const fecha_emision = searchParams.get('fecha_emision')
 
 		if (!estado) {
 			return NextResponse.json(
@@ -33,11 +32,17 @@ export async function GET(request: NextRequest) {
 			)
 		}
 
-		// Construir URL con parámetros de paginación y filtro
+		// Construir URL con parámetros de paginación y filtros
 		const params = new URLSearchParams()
 		params.append('page', page)
 		params.append('limit', limit)
 		params.append('estado', estado)
+		if (nit_proveedor) {
+			params.append('nit_proveedor', nit_proveedor)
+		}
+		if (fecha_emision) {
+			params.append('fecha_emision', fecha_emision)
+		}
 
 		// Hacer la petición al backend
 		const response = await httpClient.get(`/api/v1/documentos-staging/por-estado?${params.toString()}`, {

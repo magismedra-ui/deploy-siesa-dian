@@ -7,15 +7,15 @@ const Contacto = () => {
             <Grid2 sx={{ color: 'rgba(0, 0, 0, 0.6);' }}
             >
                 <Typography variant="body2">
-                    En caso de presentar algún problema en la inscripción o validación de datos en el presente formulario, Puede comúnicarse a las siguientes líneas de atención:
+                    Coloque aqui el contacto de la empresa.
                 </Typography>
 
                 <Grid2 component="ul" sx={{ pl: 4 }}>
                     <Typography component="li">
-                        <b>WhatsApp Soporte: </b>310 7020001
+                        <b>WhatsApp: </b>
                     </Typography>
                     <Typography component="li">
-                        <b>Correo Soporte: </b>soporte@megatiendas.co
+                        <b>Correo: </b>
                     </Typography>
                 </Grid2>
             </Grid2>

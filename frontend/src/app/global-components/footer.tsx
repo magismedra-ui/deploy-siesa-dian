@@ -62,7 +62,7 @@ const MegaFooter = () => {
                                     fontWeight: '300',
                                     fontSize: '12px'
                                 }}>
-                                    &copy; 2025 MegaTiendas. Todos los derechos reservados.
+                                    &copy; 2026 Soluciones 12D. Todos los derechos reservados.
                                 </Typography>
                             </div>
                         </Grid2>

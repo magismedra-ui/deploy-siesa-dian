@@ -32,6 +32,10 @@ import Grid2 from '@mui/material/Grid2'
 import { DatePicker, LocalizationProvider } from '@mui/x-date-pickers'
 import { AdapterDayjs } from '@mui/x-date-pickers/AdapterDayjs'
 import dayjs, { Dayjs } from 'dayjs'
+import 'dayjs/locale/es'
+import customParseFormat from 'dayjs/plugin/customParseFormat'
+
+dayjs.extend(customParseFormat)
 import InfoIcon from '@mui/icons-material/Info'
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore'
 import CodeIcon from '@mui/icons-material/Code'
@@ -170,7 +174,20 @@ function TablaEstado({
 									<TableCell>{documento.num_factura}</TableCell>
 									<TableCell>
 										{documento.fecha_emision
-											? new Date(documento.fecha_emision).toLocaleDateString('es-ES')
+											? (() => {
+												// Asegurar que la fecha se muestre correctamente
+												// El backend envía fecha_emision como 'YYYY-MM-DD' (string)
+												try {
+													const fecha = dayjs(documento.fecha_emision)
+													if (fecha.isValid()) {
+														return fecha.format('DD/MM/YYYY')
+													}
+													// Fallback al método anterior si dayjs falla
+													return new Date(documento.fecha_emision).toLocaleDateString('es-ES')
+												} catch {
+													return documento.fecha_emision
+												}
+											})()
 											: '-'}
 									</TableCell>
 									{esConciliacion ? (
@@ -565,21 +582,14 @@ export default function DescargaPage() {
 					} : undefined,
 				}
 
-				console.log('Documentos construidos desde resultado:', docs)
 				setDocumentos(docs)
 			} else {
 				// Buscar documentos en staging (para estados NO CONCILIADO)
-				console.log('Buscando documentos para:', {
-					nit_proveedor: documento.nit_proveedor,
-					num_factura: documento.num_factura,
-				})
-
 				const docs = await buscarDocumentosStaging(
 					documento.nit_proveedor,
 					documento.num_factura
 				)
 
-				console.log('Documentos recibidos:', docs)
 				setDocumentos(docs)
 			}
 		} catch (err) {
@@ -870,17 +880,54 @@ export default function DescargaPage() {
 							/>
 						</Grid2>
 						<Grid2 size={{ xs: 12, sm: 6, md: 4 }}>
-							<LocalizationProvider dateAdapter={AdapterDayjs}>
+							<LocalizationProvider dateAdapter={AdapterDayjs} adapterLocale="es">
 								<DatePicker
 									label="Fecha Emisión"
-									value={filtroFechaEmision ? dayjs(filtroFechaEmision) : null}
+									value={filtroFechaEmision ? dayjs(filtroFechaEmision, 'YYYY-MM-DD', true) : null}
 									onChange={(newValue: Dayjs | null) => {
-										setFiltroFechaEmision(newValue ? newValue.format('YYYY-MM-DD') : null)
+										if (newValue && newValue.isValid()) {
+											const fechaFormateada = newValue.format('YYYY-MM-DD')
+											setFiltroFechaEmision(fechaFormateada)
+										} else {
+											setFiltroFechaEmision(null)
+										}
 									}}
+									format="DD/MM/YYYY"
 									slotProps={{
 										textField: {
 											fullWidth: true,
 											variant: 'outlined',
+											placeholder: 'DD/MM/YYYY',
+											onBlur: (e: React.FocusEvent<HTMLInputElement>) => {
+												// Manejar entrada manual en formato DD/MM/YYYY
+												const inputValue = e.target.value.trim()
+												if (inputValue) {
+													// Intentar parsear como DD/MM/YYYY primero (formato estricto)
+													let parsed = dayjs(inputValue, 'DD/MM/YYYY', true)
+													// Si no funciona, intentar otros formatos comunes
+													if (!parsed.isValid()) {
+														parsed = dayjs(inputValue, 'D/M/YYYY', true)
+													}
+													if (!parsed.isValid()) {
+														parsed = dayjs(inputValue, 'DD-MM-YYYY', true)
+													}
+													if (!parsed.isValid()) {
+														parsed = dayjs(inputValue, 'YYYY-MM-DD', true)
+													}
+													if (!parsed.isValid()) {
+														// Último intento sin formato estricto
+														parsed = dayjs(inputValue)
+													}
+													if (parsed.isValid()) {
+														const fechaFormateada = parsed.format('YYYY-MM-DD')
+														setFiltroFechaEmision(fechaFormateada)
+													} else {
+														setFiltroFechaEmision(null)
+													}
+												} else {
+													setFiltroFechaEmision(null)
+												}
+											},
 										},
 									}}
 								/>
