@@ -12,9 +12,9 @@ export async function GET(request: NextRequest) {
 		const searchParams = request.nextUrl.searchParams
 		const page = searchParams.get('page') || '1'
 		const limit = searchParams.get('limit') || '10'
-		const estado = searchParams.get('estado')
-		const nit_proveedor = searchParams.get('nit_proveedor')
-		const fecha_emision = searchParams.get('fecha_emision')
+		const estado = searchParams.get('estado') // Filtro por estado (requerido)
+		const nit_proveedor = searchParams.get('nit_proveedor') // Filtro opcional por NIT proveedor
+		const fecha_emision = searchParams.get('fecha_emision') // Filtro opcional por fecha emisión
 
 		if (!estado) {
 			return NextResponse.json(

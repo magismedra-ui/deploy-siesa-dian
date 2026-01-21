@@ -13,6 +13,8 @@ export async function GET(request: NextRequest) {
 		const page = searchParams.get('page') || '1'
 		const limit = searchParams.get('limit') || '10'
 		const estado = searchParams.get('estado') // Filtro por estado
+		const nit_proveedor = searchParams.get('nit_proveedor') // Filtro opcional por NIT proveedor
+		const fecha_emision = searchParams.get('fecha_emision') // Filtro opcional por fecha emisión
 
 		// Obtener el token del header Authorization
 		const authHeader = request.headers.get('authorization')
@@ -23,12 +25,18 @@ export async function GET(request: NextRequest) {
 			)
 		}
 
-		// Construir URL con parámetros de paginación y filtro
+		// Construir URL con parámetros de paginación y filtros
 		const params = new URLSearchParams()
 		params.append('page', page)
 		params.append('limit', limit)
 		if (estado) {
 			params.append('estado', estado)
+		}
+		if (nit_proveedor) {
+			params.append('nit_proveedor', nit_proveedor)
+		}
+		if (fecha_emision) {
+			params.append('fecha_emision', fecha_emision)
 		}
 
 		// Hacer la petición al backend
