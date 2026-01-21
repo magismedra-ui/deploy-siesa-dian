@@ -495,7 +495,7 @@ export default function EjecucionPage() {
 
 		const queryString = params.toString()
 		const separator = queryString ? '&' : '?'
-		const url = `/api/logs/stream${queryString ? `?${queryString}` : ''}${separator}token=${token}`
+		const url = `/api/v1/logs/stream${queryString ? `?${queryString}` : ''}${separator}token=${token}`
 
 		// Nota: EventSource no soporta headers personalizados, necesitamos pasar el token en la URL
 		const eventSource = new EventSource(url, {
