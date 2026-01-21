@@ -53,8 +53,6 @@ export async function GET(request: NextRequest) {
 
 		return NextResponse.json(response.data, { status: 200 })
 	} catch (error) {
-		console.error('Error en documentos-staging por-estado API route:', error)
-
 		if (isAxiosError(error)) {
 			const axiosError = error as AxiosError<ErrorResponse>
 			const status = axiosError.response?.status || 500
