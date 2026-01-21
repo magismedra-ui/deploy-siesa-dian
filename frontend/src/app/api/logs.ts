@@ -63,7 +63,7 @@ export const getLogs = async (filters: LogsFilters = {}): Promise<LogEntry[]> =>
 		if (filters.duracionMax) params.append('duracionMax', filters.duracionMax.toString())
 
 		const queryString = params.toString()
-		const url = `/api/logs${queryString ? `?${queryString}` : ''}`
+		const url = `/api/v1/logs${queryString ? `?${queryString}` : ''}`
 
 		// Usar el token obtenido o el directo de localStorage
 		const tokenToUse = token || localStorage.getItem('auth_token')
