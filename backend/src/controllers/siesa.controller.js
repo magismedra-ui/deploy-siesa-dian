@@ -121,6 +121,8 @@ const syncFacturas = async (req, res, next) => {
         fuente: "SIESA",
         nit_proveedor: item.id_tercero || item.NitProveedor, // Mapeo solicitado
         num_factura: item.numero_proveedor || item.NumeroDocumento || "SIN_REF", // Mapeo solicitado
+        prefijo: item.docto_proveedor || null,
+        razon_social: item.razon_social || null,
         fecha_emision: fechaEmision,
         valor_total: item.vlr_neto || item.ValorTotal || 0,
         impuestos: item.vlr_imp || item.Iva || 0,
@@ -233,6 +235,8 @@ const syncFacturasInterno = async (fechaInicio, fechaFin, usuarioId = 1) => {
       fuente: "SIESA",
       nit_proveedor: item.id_tercero || item.NitProveedor,
       num_factura: item.numero_proveedor || item.NumeroDocumento || "SIN_REF",
+      prefijo: item.docto_proveedor || null,
+      razon_social: item.razon_social || null,
       fecha_emision: fechaEmision,
       valor_total: item.vlr_neto || item.ValorTotal || 0,
       impuestos: item.vlr_imp || item.Iva || 0,

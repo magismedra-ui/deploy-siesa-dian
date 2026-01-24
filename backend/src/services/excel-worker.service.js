@@ -265,6 +265,8 @@ Validación ZIP previa:
           fecha: ["fecha emisión", "fecha emision", "fecha", "fecha_emision", "fecha de emision"],
           total: ["total", "valor_total", "valor total", "monto total"],
           iva: ["iva", "impuestos", "valor iva", "impuesto"],
+          prefijo: ["prefijo"],
+          razon_social: ["nombre receptor", "razon social", "razon_social", "nombre"],
         };
         
         // Función para validar que existen las columnas mínimas requeridas
@@ -535,6 +537,8 @@ Validación ZIP previa:
                 const totalStr = getValue(COLUMNAS.total);
                 const ivaStr = getValue(COLUMNAS.iva);
                 const fechaStr = getValue(COLUMNAS.fecha);
+                const prefijoStr = getValue(COLUMNAS.prefijo);
+                const razonSocialStr = getValue(COLUMNAS.razon_social);
                 
                 // Obtener número de factura (folio o CUFE)
                 let numFacturaStr = getValue(COLUMNAS.folio);
@@ -621,6 +625,8 @@ Validación ZIP previa:
                   fuente: "DIAN",
                   nit_proveedor: nitProveedor,
                   num_factura: numFactura,
+                  prefijo: prefijoStr && prefijoStr.trim() !== '' ? prefijoStr.trim() : null,
+                  razon_social: razonSocialStr && razonSocialStr.trim() !== '' ? razonSocialStr.trim() : null,
                   fecha_emision: fechaEmision,
                   valor_total: valorTotal,
                   impuestos: impuestos,

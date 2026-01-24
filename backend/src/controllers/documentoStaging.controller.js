@@ -9,6 +9,8 @@ exports.createDocumento = async (req, res) => {
       fuente,
       nit_proveedor,
       num_factura,
+      prefijo,
+      razon_social,
       fecha_emision,
       valor_total,
       impuestos,
@@ -26,6 +28,8 @@ exports.createDocumento = async (req, res) => {
       fuente,
       nit_proveedor,
       num_factura,
+      prefijo,
+      razon_social,
       fecha_emision,
       valor_total,
       impuestos,
@@ -100,6 +104,8 @@ exports.updateDocumento = async (req, res) => {
       fuente,
       nit_proveedor,
       num_factura,
+      prefijo,
+      razon_social,
       fecha_emision,
       valor_total,
       impuestos,
@@ -123,6 +129,8 @@ exports.updateDocumento = async (req, res) => {
     documento.fuente = fuente || documento.fuente;
     documento.nit_proveedor = nit_proveedor || documento.nit_proveedor;
     documento.num_factura = num_factura || documento.num_factura;
+    documento.prefijo = prefijo !== undefined ? prefijo : documento.prefijo;
+    documento.razon_social = razon_social !== undefined ? razon_social : documento.razon_social;
     documento.fecha_emision = fecha_emision || documento.fecha_emision;
     documento.valor_total =
       valor_total !== undefined ? valor_total : documento.valor_total;

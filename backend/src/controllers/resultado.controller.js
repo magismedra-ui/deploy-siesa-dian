@@ -9,6 +9,8 @@ exports.createResultado = async (req, res) => {
       tipo_resultado,
       nit_proveedor,
       num_factura,
+      prefijo,
+      razon_social,
       fecha_emision,
       valor_dian,
       valor_siesa,
@@ -27,6 +29,8 @@ exports.createResultado = async (req, res) => {
       tipo_resultado,
       nit_proveedor,
       num_factura,
+      prefijo,
+      razon_social,
       fecha_emision,
       valor_dian,
       valor_siesa,
@@ -163,6 +167,8 @@ exports.updateResultado = async (req, res) => {
       tipo_resultado,
       nit_proveedor,
       num_factura,
+      prefijo,
+      razon_social,
       fecha_emision,
       valor_dian,
       valor_siesa,
@@ -187,6 +193,8 @@ exports.updateResultado = async (req, res) => {
     resultado.tipo_resultado = tipo_resultado || resultado.tipo_resultado;
     resultado.nit_proveedor = nit_proveedor || resultado.nit_proveedor;
     resultado.num_factura = num_factura || resultado.num_factura;
+    resultado.prefijo = prefijo !== undefined ? prefijo : resultado.prefijo;
+    resultado.razon_social = razon_social !== undefined ? razon_social : resultado.razon_social;
     resultado.fecha_emision = fecha_emision || resultado.fecha_emision;
     resultado.valor_dian =
       valor_dian !== undefined ? valor_dian : resultado.valor_dian;

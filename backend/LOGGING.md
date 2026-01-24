@@ -126,7 +126,7 @@ Stream de logs en tiempo real usando Server-Sent Events (SSE).
 
 ```javascript
 // En el frontend
-const eventSource = new EventSource('/api/v1/logs/stream?niveles=error,warn');
+const eventSource = new EventSource('/api/logs/stream?niveles=error,warn');
 
 eventSource.onmessage = (event) => {
   const log = JSON.parse(event.data);

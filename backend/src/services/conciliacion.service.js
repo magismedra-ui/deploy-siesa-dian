@@ -274,10 +274,16 @@ const procesarConciliacion = async (ejecucionId = null) => {
 						fechaEmision = fechaEmision.split('T')[0];
 					}
 					
+					// Obtener prefijo y razon_social (priorizar DIAN, si no está usar SIESA)
+					const prefijo = docDian.prefijo || docSiesa.prefijo || null;
+					const razonSocial = docDian.razon_social || docSiesa.razon_social || null;
+					
 					resultadosBatch.push({
 						tipo_resultado: estadoDocumento,
 						nit_proveedor: docDian.nit_proveedor,
 						num_factura: docDian.num_factura,
+						prefijo: prefijo,
+						razon_social: razonSocial,
 						fecha_emision: fechaEmision, // Guardar fecha_emision
 						valor_dian: VlrDIAN,
 						valor_siesa: VlrSIESA,

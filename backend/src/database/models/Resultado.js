@@ -22,6 +22,14 @@ const Resultado = sequelize.define(
       type: DataTypes.STRING(50),
       allowNull: false,
     },
+    prefijo: {
+      type: DataTypes.STRING(20),
+      allowNull: true,
+    },
+    razon_social: {
+      type: DataTypes.STRING(150),
+      allowNull: true,
+    },
     fecha_emision: {
       type: DataTypes.DATEONLY,
       allowNull: false,
