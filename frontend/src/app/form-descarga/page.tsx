@@ -133,6 +133,8 @@ function TablaEstado({
 							<TableCell>Fuente</TableCell>
 							<TableCell>NIT Proveedor</TableCell>
 							<TableCell>Número Factura</TableCell>
+							<TableCell>Prefijo</TableCell>
+							<TableCell>Razón Social</TableCell>
 							<TableCell>Fecha Emisión</TableCell>
 							{esConciliacion ? (
 								<>
@@ -155,13 +157,13 @@ function TablaEstado({
 					<TableBody>
 						{loading ? (
 							<TableRow>
-								<TableCell colSpan={esConciliacion ? 12 : 11} align="center">
+								<TableCell colSpan={esConciliacion ? 14 : 13} align="center">
 									<CircularProgress />
 								</TableCell>
 							</TableRow>
 						) : documentos.length === 0 ? (
 							<TableRow>
-								<TableCell colSpan={esConciliacion ? 12 : 11} align="center">
+								<TableCell colSpan={esConciliacion ? 14 : 13} align="center">
 									No hay documentos disponibles
 								</TableCell>
 							</TableRow>
@@ -172,6 +174,8 @@ function TablaEstado({
 									<TableCell>{documento.fuente}</TableCell>
 									<TableCell>{documento.nit_proveedor}</TableCell>
 									<TableCell>{documento.num_factura}</TableCell>
+									<TableCell>{documento.prefijo || '-'}</TableCell>
+									<TableCell>{documento.razon_social || '-'}</TableCell>
 									<TableCell>
 										{documento.fecha_emision
 											? (() => {
@@ -693,6 +697,8 @@ export default function DescargaPage() {
 					Fuente: doc.fuente,
 					'NIT Proveedor': doc.nit_proveedor,
 					'Número Factura': doc.num_factura,
+					Prefijo: doc.prefijo || '',
+					'Razón Social': doc.razon_social || '',
 					'Fecha Emisión': doc.fecha_emision
 						? new Date(doc.fecha_emision).toLocaleDateString('es-ES')
 						: '',
@@ -745,6 +751,8 @@ export default function DescargaPage() {
 						{ wch: 12 }, // Fuente
 						{ wch: 15 }, // NIT Proveedor
 						{ wch: 20 }, // Número Factura
+						{ wch: 12 }, // Prefijo
+						{ wch: 30 }, // Razón Social
 						{ wch: 15 }, // Fecha Emisión
 						{ wch: 15 }, // Valor DIAN
 						{ wch: 15 }, // Valor SIESA
@@ -758,6 +766,8 @@ export default function DescargaPage() {
 						{ wch: 12 }, // Fuente
 						{ wch: 15 }, // NIT Proveedor
 						{ wch: 20 }, // Número Factura
+						{ wch: 12 }, // Prefijo
+						{ wch: 30 }, // Razón Social
 						{ wch: 15 }, // Fecha Emisión
 						{ wch: 15 }, // Valor Total
 						{ wch: 15 }, // Impuestos

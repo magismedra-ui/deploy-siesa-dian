@@ -13,6 +13,8 @@ export interface Resultado {
 	tipo_resultado: string
 	nit_proveedor: string
 	num_factura: string
+	prefijo?: string
+	razon_social?: string
 	fecha_emision?: string
 	valor_dian: number
 	valor_siesa: number
@@ -35,6 +37,8 @@ export interface DocumentoStaging {
 	id?: number
 	nit_proveedor: string
 	num_factura: string
+	prefijo?: string
+	razon_social?: string
 	fuente: 'DIAN' | 'SIESA'
 	estado?: string
 	fecha_emision?: string
@@ -147,6 +151,8 @@ const transformarResultadoADocumentoStaging = (resultado: Resultado): DocumentoS
 		id: resultado.id,
 		nit_proveedor: resultado.nit_proveedor,
 		num_factura: resultado.num_factura,
+		prefijo: resultado.prefijo,
+		razon_social: resultado.razon_social,
 		fuente: fuente as 'DIAN' | 'SIESA',
 		estado: resultado.tipo_resultado,
 		fecha_emision: resultado.fecha_emision || undefined,
