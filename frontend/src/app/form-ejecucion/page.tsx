@@ -213,7 +213,11 @@ export default function EjecucionPage() {
 				cronExpressionn,
 			}
 		await configurarScheduler(data)
-		mostrarMensaje('success', 'Éxito', 'Configuración del scheduler guardada correctamente')
+		const mensaje =
+			schedulerEnabled === true
+				? 'Modo automático activado. La sincronización con SIESA (cada 8 h) y la conciliación seguirán ejecutándose en el servidor aunque cierre esta ventana.'
+				: 'Configuración del scheduler guardada correctamente.'
+		mostrarMensaje('success', 'Éxito', mensaje)
 		
 		// La barra de progreso se activará cuando lleguen los logs del proceso en segundo plano
 		} catch (error) {
@@ -229,6 +233,7 @@ export default function EjecucionPage() {
 			// La barra de progreso se activará cuando lleguen los logs del proceso en segundo plano
 		}
 	}
+
 
 	const mostrarMensaje = (
 		type: 'success' | 'error',
@@ -831,7 +836,7 @@ export default function EjecucionPage() {
 				</Box>
 
 				<Grid2 container spacing={3}>
-					{/* COLUMNA 1: SUBIR DOCUMENTO */}
+					{/* COLUMNA IZQUIERDA: Subir Documento Excel */}
 					<Grid2 size={{ xs: 12, md: 6 }}>
 						<Paper sx={{ padding: 3 }}>
 							<Typography variant="h6" sx={{ marginBottom: 2 }}>
@@ -911,15 +916,16 @@ export default function EjecucionPage() {
 								)}
 							</Box>
 						</Paper>
-            </Grid2>
+					</Grid2>
 
-					{/* COLUMNA 2: FORMULARIO DE CONFIGURACIÓN DEL SCHEDULER */}
+					{/* COLUMNA DERECHA: Ejecutar Conciliación */}
 					<Grid2 size={{ xs: 12, md: 6 }}>
 						<Paper sx={{ padding: 3 }}>
 							<Typography variant="h6" sx={{ marginBottom: 2 }}>
 								2. Ejecutar Conciliación
 							</Typography>
 							<Box sx={{ display: 'flex', flexDirection: 'column', gap: 3, opacity: formularioDeshabilitado ? 0.6 : 1, pointerEvents: formularioDeshabilitado ? 'none' : 'auto' }}>
+								{/* Sección Scheduler */}
 								<FormControl fullWidth variant="filled">
 									<InputLabel>CONCILIACION</InputLabel>
 									<Select

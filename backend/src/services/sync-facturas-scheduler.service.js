@@ -1,25 +1,26 @@
 const cron = require('node-cron');
-const { ejecutarSyncFacturas } = require('./sync-facturas.service');
+const { ejecutarSyncSiesaAutomatico } = require('./sync-facturas.service');
 const { getSchedulerEnabled } = require('../config/scheduler.config');
 
 /**
- * Referencia al scheduler activo
+ * Referencia al scheduler activo (SIESA cada 8h en modo automático)
  */
 let syncSchedulerTask = null;
 
 /**
- * Configurar scheduler de sincronización de facturas
- * Ejecuta cada 12 horas cuando schedulerEnabled === true
+ * Configurar scheduler de sincronización SIESA en modo automático de conciliación.
+ * - Primera ejecución al activar el modo automático (conteo desde activación).
+ * - Luego cada 8 horas (expresión cron: minuto 0, cada 8 horas).
+ * - Usa fechaFin = hoy, fechaInicio = hoy - 2 días (YYYYMMDD) y las dos consultas
+ *   listar_facturas_servicios y listar_facturas_proveedores.
  */
 const setupSyncFacturasScheduler = () => {
-	// Detener scheduler existente si existe
 	if (syncSchedulerTask) {
 		syncSchedulerTask.stop();
 		syncSchedulerTask = null;
 		console.log('[Sync Scheduler] Scheduler anterior detenido');
 	}
 
-	// Verificar si está habilitado
 	const schedulerEnabled = getSchedulerEnabled();
 
 	if (schedulerEnabled !== true) {
@@ -29,14 +30,9 @@ const setupSyncFacturasScheduler = () => {
 		return null;
 	}
 
-	// Expresión cron: cada 12 horas (0 */12 * * *)
-	const cronExpression = '0 */12 * * *';
+	// Cada 8 horas: 0:00, 8:00, 16:00 (America/Bogota)
+	const cronExpression = '0 */8 * * *';
 
-	console.log(
-		`[Sync Scheduler] Configurando scheduler de sincronización con expresión: ${cronExpression} (cada 12 horas)`
-	);
-
-	// Validar expresión cron
 	if (!cron.validate(cronExpression)) {
 		console.error(
 			`[Sync Scheduler] Expresión cron inválida: ${cronExpression}`
@@ -44,18 +40,36 @@ const setupSyncFacturasScheduler = () => {
 		return null;
 	}
 
-	// Crear scheduler
+	console.log(
+		'[Sync Scheduler] Modo automático: primera sincronización SIESA al activar; luego cada 8 horas.'
+	);
+
+	// Primera ejecución al activar el modo automático (conteo inicia aquí)
+	setImmediate(async () => {
+		try {
+			console.log(
+				'[Sync Scheduler] Ejecutando primera sincronización SIESA (activación modo automático)...'
+			);
+			await ejecutarSyncSiesaAutomatico('activacion-modo-automatico');
+		} catch (error) {
+			console.error(
+				'[Sync Scheduler] Error en primera sincronización SIESA:',
+				error
+			);
+		}
+	});
+
 	syncSchedulerTask = cron.schedule(
 		cronExpression,
 		async () => {
 			try {
 				console.log(
-					'[Sync Scheduler] Ejecutando sincronización programada cada 12 horas...'
+					'[Sync Scheduler] Ejecutando sincronización SIESA programada (cada 8h)...'
 				);
-				await ejecutarSyncFacturas('scheduler-12h');
+				await ejecutarSyncSiesaAutomatico('scheduler-8h');
 			} catch (error) {
 				console.error(
-					'[Sync Scheduler] Error en ejecución programada:',
+					'[Sync Scheduler] Error en sincronización programada:',
 					error
 				);
 			}
@@ -66,7 +80,9 @@ const setupSyncFacturasScheduler = () => {
 		}
 	);
 
-	console.log('[Sync Scheduler] Scheduler de sincronización iniciado y activo');
+	console.log(
+		'[Sync Scheduler] Scheduler SIESA cada 8h iniciado (modo automático)'
+	);
 	return syncSchedulerTask;
 };
 

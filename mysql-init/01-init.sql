@@ -91,6 +91,7 @@ CREATE TABLE IF NOT EXISTS `proc_documentos_staging` (
   `createdAt` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
   `updatedAt` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   PRIMARY KEY (`id`),
+  UNIQUE KEY `idx_unique_documento` (`fuente`, `nit_proveedor`, `num_factura`, `prefijo`),
   CONSTRAINT `fk_staging_ejecucion`
     FOREIGN KEY (`ejecucion_id`)
     REFERENCES `proc_ejecuciones` (`id`)
