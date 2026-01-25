@@ -1,4 +1,5 @@
 const { Worker } = require("bullmq");
+const { Op } = require("sequelize");
 const { redisConnection } = require("../config/queue");
 const XLSX = require("xlsx");
 const fs = require("fs");
@@ -258,15 +259,17 @@ Validación ZIP previa:
         // ============================================
         
         // 1. Validar estructura del Excel (headers esperados)
+        // folio → num_factura en proc_documentos_staging (y en clave de deduplicación)
         const COLUMNAS_ESPERADAS = {
-          nit: ["nit emisor", "nit", "nit_proveedor", "nit proveedor"],
-          cufe: ["cufe/cude", "cufe", "cude", "num_factura", "numero factura"],
-          folio: ["folio", "folio factura", "numero folio"],
-          fecha: ["fecha emisión", "fecha emision", "fecha", "fecha_emision", "fecha de emision"],
-          total: ["total", "valor_total", "valor total", "monto total"],
-          iva: ["iva", "impuestos", "valor iva", "impuesto"],
-          prefijo: ["prefijo"],
-          razon_social: ["nombre receptor", "razon social", "razon_social", "nombre"],
+          nit: ["NIT Receptor"],
+          cufe: ["CUFE/CUDE", "cufe/cude"],
+          folio: ["Folio"], // exclusivo para num_factura; no usar CUFE
+          fecha: ["Fecha Emisión", "fecha emision", "fecha_emision", "fecha de emision"],
+          total: ["Total"],
+          iva: ["IVA"],
+          prefijo: ["Prefijo"],
+          razon_social: ["Nombre Receptor"],
+          tipo_documento: ["Tipo de documento"],
         };
         
         // Función para validar que existen las columnas mínimas requeridas
@@ -311,7 +314,7 @@ Validación ZIP previa:
         const validarDatosDocumento = (documento, rowNumber) => {
           const errores = [];
           
-          // Validar NIT (STRING(50), not null)
+          // Validar NIT (STRING(50), not null). Solo dígitos (0-9).
           if (!documento.nit_proveedor) {
             errores.push("NIT es requerido y no puede estar vacío");
           } else {
@@ -320,8 +323,8 @@ Validación ZIP previa:
               errores.push("NIT no puede estar vacío");
             } else if (nitStr.length > 50) {
               errores.push(`NIT excede longitud máxima (50 caracteres). Longitud actual: ${nitStr.length}`);
-            } else if (!/^[0-9\-]+$/.test(nitStr)) {
-              errores.push(`NIT contiene caracteres inválidos. Solo se permiten números y guiones. Valor: "${nitStr}"`);
+            } else if (!/^[0-9]+$/.test(nitStr)) {
+              errores.push(`NIT contiene caracteres inválidos. Solo se permiten números. Valor: "${nitStr}"`);
             }
           }
           
@@ -392,6 +395,38 @@ Validación ZIP previa:
         
         let headers = null;
         const COLUMNAS = COLUMNAS_ESPERADAS;
+
+        // Evitar duplicidad en proc_documentos_staging: se considera duplicado si coinciden
+        // Folio (Excel) = num_factura (tabla), NIT Receptor (Excel) = nit_proveedor (tabla),
+        // Prefijo (Excel) = prefijo (tabla). Clave única: nit_proveedor|num_factura|prefijo.
+        const keyDian = (d) =>
+          `${d.nit_proveedor || ''}|${d.num_factura || ''}|${d.prefijo ?? ''}`;
+
+        const filtrarDuplicadosDian = async (batch) => {
+          if (!batch || batch.length === 0) return [];
+          const nits = [...new Set(batch.map((d) => d.nit_proveedor).filter(Boolean))];
+          if (nits.length === 0) return batch;
+          const existing = await DocumentoStaging.findAll({
+            where: {
+              fuente: "DIAN",
+              nit_proveedor: { [Op.in]: nits },
+            },
+            attributes: ["nit_proveedor", "num_factura", "prefijo"],
+            raw: true,
+          });
+          const existingKeys = new Set(
+            existing.map((r) =>
+              `${r.nit_proveedor || ''}|${r.num_factura || ''}|${r.prefijo ?? ''}`
+            )
+          );
+          const seen = new Set();
+          return batch.filter((d) => {
+            const k = keyDian(d);
+            if (existingKeys.has(k) || seen.has(k)) return false;
+            seen.add(k);
+            return true;
+          });
+        };
 
         // ============================================
         // PROCESAMIENTO CON SHEETJS - SOLO VALORES RAW COMO STRING
@@ -533,18 +568,21 @@ Validación ZIP previa:
                 };
 
                 // Obtener valores como strings (ya están convertidos a string)
+                // NIT Receptor → nit_proveedor; Folio → num_factura; Prefijo → prefijo (usados en deduplicación)
                 const nitStr = getValue(COLUMNAS.nit);
                 const totalStr = getValue(COLUMNAS.total);
                 const ivaStr = getValue(COLUMNAS.iva);
                 const fechaStr = getValue(COLUMNAS.fecha);
                 const prefijoStr = getValue(COLUMNAS.prefijo);
                 const razonSocialStr = getValue(COLUMNAS.razon_social);
-                
-                // Obtener número de factura (folio o CUFE)
-                let numFacturaStr = getValue(COLUMNAS.folio);
-                if (!numFacturaStr || numFacturaStr === '') {
-                  numFacturaStr = getValue(COLUMNAS.cufe);
+                const tipoDocumentoStr = getValue(COLUMNAS.tipo_documento);
+
+                // Excluir registros con "Application response" en Tipo de documento
+                if (tipoDocumentoStr && tipoDocumentoStr.trim().toLowerCase() === "application response") {
+                  continue;
                 }
+                
+                const numFacturaStr = getValue(COLUMNAS.folio);
                 
                 // ============================================
                 // CONVERSIÓN DE TIPOS DESDE STRING
@@ -552,11 +590,15 @@ Validación ZIP previa:
                 // Todos los valores vienen como string, ahora los convertimos a los tipos necesarios
                 // ============================================
                 
-                // NIT: ya es string, solo validar
-                const nitProveedor = nitStr.trim() || null;
+                // NIT Receptor (Excel) → nit_proveedor (tabla). Solo dígitos; quitar puntos, guiones y caracteres especiales.
+                let nitProveedor = (nitStr != null ? String(nitStr).trim() : '') || null;
+                if (nitProveedor) {
+                  nitProveedor = nitProveedor.replace(/\D/g, '') || null;
+                }
                 
-                // Número de factura: ya es string, solo validar
-                const numFactura = numFacturaStr.trim() || null;
+                // Folio (Excel) → num_factura (tabla); usado en deduplicación. No usar CUFE.
+                const numFactura =
+                  (numFacturaStr != null ? String(numFacturaStr).trim() : '') || null;
                 
                 // Fecha: parsear desde string
                 let fechaEmision = null;
@@ -623,9 +665,10 @@ Validación ZIP previa:
                 const documento = {
                   ejecucion_id: ejecucionId,
                   fuente: "DIAN",
-                  nit_proveedor: nitProveedor,
-                  num_factura: numFactura,
-                  prefijo: prefijoStr && prefijoStr.trim() !== '' ? prefijoStr.trim() : null,
+                  nit_proveedor: nitProveedor != null ? String(nitProveedor).trim() : null, // NIT Receptor
+                  num_factura:
+                    numFactura != null ? String(numFactura).trim() : null, // Folio → num_factura
+                  prefijo: prefijoStr && prefijoStr.trim() !== '' ? prefijoStr.trim() : null, // Prefijo
                   razon_social: razonSocialStr && razonSocialStr.trim() !== '' ? razonSocialStr.trim() : null,
                   fecha_emision: fechaEmision,
                   valor_total: valorTotal,
@@ -644,10 +687,12 @@ Validación ZIP previa:
 
                 if (batch.length >= BATCH_SIZE) {
                   try {
-                    await DocumentoStaging.bulkCreate(batch, {
-                      ignoreDuplicates: true,
-                    });
-
+                    const aInsertar = await filtrarDuplicadosDian(batch);
+                    if (aInsertar.length > 0) {
+                      await DocumentoStaging.bulkCreate(aInsertar, {
+                        ignoreDuplicates: true,
+                      });
+                    }
                     await log({
                       jobId: jobId,
                       proceso: "excel-processing",
@@ -717,9 +762,12 @@ Validación ZIP previa:
 
         if (batch.length > 0) {
           try {
-            await DocumentoStaging.bulkCreate(batch, {
-              ignoreDuplicates: true,
-            });
+            const aInsertar = await filtrarDuplicadosDian(batch);
+            if (aInsertar.length > 0) {
+              await DocumentoStaging.bulkCreate(aInsertar, {
+                ignoreDuplicates: true,
+              });
+            }
           } catch (e) {
             errores.push({
               fila: "BATCH_FINAL",
@@ -744,6 +792,23 @@ Validación ZIP previa:
           },
           { where: { id: ejecucionId } }
         );
+
+        if (errores.length > 0) {
+          console.error(
+            `[Excel Worker] Ejecución ${ejecucionId} - Detalle de ${errores.length} errores:`
+          );
+          errores.forEach((e, i) => {
+            const fila = e.fila != null ? e.fila : "?";
+            const msg = e.error || "Error desconocido";
+            console.error(`[Excel Worker]   Error ${i + 1}/${errores.length} - Fila: ${fila} - ${msg}`);
+            if (e.data && typeof e.data === "object" && Object.keys(e.data).length > 0) {
+              const dataStr = JSON.stringify(e.data);
+              const trunc =
+                dataStr.length > 200 ? dataStr.slice(0, 200) + "..." : dataStr;
+              console.error(`[Excel Worker]     Data: ${trunc}`);
+            }
+          });
+        }
 
         // Log de finalización exitosa
         await log({

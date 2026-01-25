@@ -32,8 +32,9 @@ class SiesaAdapterService {
    * @param {string} idCompania
    * @param {string} idConsulta Nombre de la consulta SQL configurada en SIESA
    * @param {object} parametros Objeto clave-valor para los filtros
+   * @param {string} idProveedor IdProveedor opcional (por defecto usa SIESA_PROVIDER_ID o "I2D")
    */
-  async ejecutarConsulta(idCompania, idConsulta, parametros = {}) {
+  async ejecutarConsulta(idCompania, idConsulta, parametros = {}, idProveedor = null) {
     const client = await this.getClient();
 
     // Construcción de parámetros dinámicos para el XML
@@ -47,13 +48,16 @@ class SiesaAdapterService {
       paramNodes += `<${key}>${value}</${key}>`;
     }
 
+    // IdProveedor: usar el parámetro si se proporciona, sino usar variable de entorno o valor por defecto
+    const proveedorId = idProveedor || process.env.SIESA_PROVIDER_ID || "I2D";
+
     // Estructura XML interna que va dentro del string pvstrxmlParametros
     // SIESA espera este XML como un string dentro del parámetro SOAP
     const xmlParametros = `<?xml version="1.0" encoding="utf-8"?>
 <Consulta>
   <NombreConexion>Real</NombreConexion>
   <IdCia>${idCompania}</IdCia>
-  <IdProveedor>${process.env.SIESA_PROVIDER_ID || "I2D"}</IdProveedor>
+  <IdProveedor>${proveedorId}</IdProveedor>
   <IdConsulta>${idConsulta}</IdConsulta>
   <Usuario>${process.env.SIESA_USER || "webservices"}</Usuario>
   <Clave>${process.env.SIESA_PASSWORD || "Webservices"}</Clave>
@@ -106,8 +110,10 @@ class SiesaAdapterService {
    * @param {string} fechaInicio
    * @param {string} fechaFin
    * @param {string} nombreConsulta 'listar_facturas_servicios' o 'listar_facturas_proveedores'
+   * @param {string} idCia IdCia opcional (por defecto usa SIESA_CIA o "5")
+   * @param {string} idProveedor IdProveedor opcional (por defecto usa SIESA_PROVIDER_ID o "I2D")
    */
-  async getFacturas(fechaInicio, fechaFin, nombreConsulta, idCia) {
+  async getFacturas(fechaInicio, fechaFin, nombreConsulta, idCia = null, idProveedor = null) {
     // Si no se proporciona idCia, se usa la variable de entorno o el valor por defecto
     const cia = idCia || process.env.SIESA_CIA || "5";
 
@@ -130,7 +136,7 @@ class SiesaAdapterService {
       const data = await this.ejecutarConsulta(cia, nombreConsulta, {
         fecha_desde: fechaInicio,
         fecha_hasta: fechaFin,
-      });
+      }, idProveedor);
 
       // Normalización básica
       if (Array.isArray(data)) {

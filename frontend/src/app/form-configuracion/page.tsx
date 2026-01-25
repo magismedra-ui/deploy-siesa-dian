@@ -20,7 +20,12 @@ import {
 	MenuItem,
 	FormControl,
 	InputLabel,
+	TextField,
 } from '@mui/material'
+import { DatePicker } from '@mui/x-date-pickers/DatePicker'
+import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider'
+import { AdapterDayjs } from '@mui/x-date-pickers/AdapterDayjs'
+import dayjs, { Dayjs } from 'dayjs'
 import EditIcon from '@mui/icons-material/Edit'
 import DeleteIcon from '@mui/icons-material/Delete'
 import AddIcon from '@mui/icons-material/Add'
@@ -46,6 +51,7 @@ import {
 	type Rol,
 	type Usuario,
 } from '@/app/api/configuracion'
+import { syncSiesaConParametros, type SiesaSyncParams } from '@/app/api/siesa'
 
 export default function ConfiguracionPage() {
 	// Estados para datos
@@ -94,6 +100,18 @@ export default function ConfiguracionPage() {
 	const [messageType, setMessageType] = useState<'success' | 'error'>('success')
 	const [messageTitle, setMessageTitle] = useState('')
 	const [messageText, setMessageText] = useState('')
+
+	// Estados para parámetros SIESA (persistencia en memoria)
+	const [siesaParams, setSiesaParams] = useState<SiesaSyncParams>({
+		fechaInicio: '',
+		fechaFin: '',
+		idCia: '5',
+		nombreConsulta: 'listar_facturas_servicios',
+		idProveedor: 'I2D',
+	})
+	const [fechaInicioDayjs, setFechaInicioDayjs] = useState<Dayjs | null>(null)
+	const [fechaFinDayjs, setFechaFinDayjs] = useState<Dayjs | null>(null)
+	const [sincronizandoSiesa, setSincronizandoSiesa] = useState(false)
 
 	// Cargar datos al montar el componente
 	useEffect(() => {
@@ -362,6 +380,68 @@ export default function ConfiguracionPage() {
 		}
 	}
 
+	// ==================== PARÁMETROS SIESA ====================
+
+	// Función para convertir Dayjs a formato YYYYMMDD
+	const convertirFechaAYYYYMMDD = (fecha: Dayjs | null): string => {
+		if (!fecha) return ''
+		return fecha.format('YYYYMMDD')
+	}
+
+	const handleSyncSiesa = async () => {
+		// Validar campos requeridos
+		if (!fechaInicioDayjs || !fechaFinDayjs) {
+			mostrarMensaje('error', 'Error', 'Por favor seleccione fecha de inicio y fecha de fin')
+			return
+		}
+
+		// Validar que fechaFin no exceda la fecha actual
+		const hoy = dayjs()
+		if (fechaFinDayjs.isAfter(hoy, 'day')) {
+			mostrarMensaje('error', 'Error', 'La fecha fin no debe exceder la fecha actual')
+			return
+		}
+
+		// Validar que fechaInicio sea igual o anterior a fechaFin
+		if (fechaInicioDayjs.isAfter(fechaFinDayjs, 'day')) {
+			mostrarMensaje('error', 'Error', 'La fecha de inicio debe ser igual o anterior a la fecha fin')
+			return
+		}
+
+		// Convertir fechas a formato YYYYMMDD
+		const fechaInicioStr = convertirFechaAYYYYMMDD(fechaInicioDayjs)
+		const fechaFinStr = convertirFechaAYYYYMMDD(fechaFinDayjs)
+
+		// Actualizar parámetros en memoria con las fechas convertidas
+		const paramsActualizados: SiesaSyncParams = {
+			...siesaParams,
+			fechaInicio: fechaInicioStr,
+			fechaFin: fechaFinStr,
+		}
+		setSiesaParams(paramsActualizados)
+
+		setSincronizandoSiesa(true)
+		try {
+			const response = await syncSiesaConParametros(paramsActualizados)
+			
+			// Persistir parámetros en memoria (ya están actualizados en estado)
+			
+			mostrarMensaje(
+				'success',
+				'Éxito',
+				`Sincronización completada. ${response.registrosProcesados} registros procesados.`
+			)
+		} catch (error) {
+			mostrarMensaje(
+				'error',
+				'Error',
+				error instanceof Error ? error.message : 'Error al sincronizar facturas desde SIESA'
+			)
+		} finally {
+			setSincronizandoSiesa(false)
+		}
+	}
+
 	return (
 		<Box sx={{ minHeight: '100vh', display: 'flex', flexDirection: 'column' }}>
 			<Encabezado formTitulo="Configuración del sistema" />
@@ -444,6 +524,165 @@ export default function ConfiguracionPage() {
 							</TableBody>
 						</Table>
 					</TableContainer>
+				</Paper>
+
+				{/* SECCIÓN PARÁMETROS SIESA */}
+				<Paper sx={{ padding: 3, marginBottom: 4 }}>
+					<Typography variant="h5" sx={{ marginBottom: 2 }}>
+						Parámetros SIESA
+					</Typography>
+					<Box sx={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
+						<Box sx={{ display: 'flex', gap: 2 }}>
+							<LocalizationProvider dateAdapter={AdapterDayjs} adapterLocale="es">
+								<DatePicker
+									label="Fecha Inicio"
+									value={fechaInicioDayjs}
+									onChange={(newValue) => {
+										setFechaInicioDayjs(newValue)
+										if (newValue) {
+											const fechaStr = convertirFechaAYYYYMMDD(newValue)
+											setSiesaParams((prev) => ({
+												...prev,
+												fechaInicio: fechaStr,
+											}))
+										}
+									}}
+									maxDate={fechaFinDayjs || dayjs()}
+									slotProps={{
+										textField: {
+											variant: 'filled',
+											fullWidth: true,
+											sx: {
+												'& .MuiFilledInput-root': {
+													backgroundColor: '#ffffff00 !important',
+													borderRadius: '0px',
+												},
+											},
+										},
+									}}
+								/>
+							</LocalizationProvider>
+							<LocalizationProvider dateAdapter={AdapterDayjs} adapterLocale="es">
+								<DatePicker
+									label="Fecha Fin"
+									value={fechaFinDayjs}
+									onChange={(newValue) => {
+										setFechaFinDayjs(newValue)
+										if (newValue) {
+											const fechaStr = convertirFechaAYYYYMMDD(newValue)
+											setSiesaParams((prev) => ({
+												...prev,
+												fechaFin: fechaStr,
+											}))
+										}
+									}}
+									maxDate={dayjs()}
+									minDate={fechaInicioDayjs || undefined}
+									slotProps={{
+										textField: {
+											variant: 'filled',
+											fullWidth: true,
+											sx: {
+												'& .MuiFilledInput-root': {
+													backgroundColor: '#ffffff00 !important',
+													borderRadius: '0px',
+												},
+											},
+										},
+									}}
+								/>
+							</LocalizationProvider>
+						</Box>
+
+						<Box sx={{ display: 'flex', gap: 2 }}>
+							<TextField
+								fullWidth
+								label="ID Compañía"
+								value={siesaParams.idCia}
+								onChange={(e) =>
+									setSiesaParams((prev) => ({
+										...prev,
+										idCia: e.target.value || '5',
+									}))
+								}
+								placeholder="5"
+								variant="filled"
+								sx={{
+									'& .MuiFilledInput-root': {
+										backgroundColor: '#ffffff00 !important',
+										borderRadius: '0px',
+									},
+								}}
+							/>
+							<FormControl fullWidth variant="filled">
+								<InputLabel>Nombre Consulta</InputLabel>
+								<Select
+									value={siesaParams.nombreConsulta}
+									onChange={(e) =>
+										setSiesaParams((prev) => ({
+											...prev,
+											nombreConsulta: e.target.value as 'listar_facturas_servicios' | 'listar_facturas_proveedores',
+										}))
+									}
+									label="Nombre Consulta"
+									sx={{
+										'& .MuiFilledInput-root': {
+											backgroundColor: '#ffffff00 !important',
+											borderRadius: '0px',
+										},
+									}}
+								>
+									<MenuItem value="listar_facturas_servicios">Listar Facturas Servicios</MenuItem>
+									<MenuItem value="listar_facturas_proveedores">Listar Facturas Proveedores</MenuItem>
+								</Select>
+							</FormControl>
+							<TextField
+								fullWidth
+								label="ID Proveedor"
+								value={siesaParams.idProveedor}
+								onChange={(e) =>
+									setSiesaParams((prev) => ({
+										...prev,
+										idProveedor: e.target.value || 'I2D',
+									}))
+								}
+								placeholder="I2D"
+								variant="filled"
+								sx={{
+									'& .MuiFilledInput-root': {
+										backgroundColor: '#ffffff00 !important',
+										borderRadius: '0px',
+									},
+								}}
+							/>
+						</Box>
+
+						<Box sx={{ display: 'flex', justifyContent: 'flex-end' }}>
+							<Button
+								size="small"
+								variant="contained"
+								onClick={handleSyncSiesa}
+								disabled={sincronizandoSiesa || !fechaInicioDayjs || !fechaFinDayjs}
+								sx={{
+									backgroundColor: '#004084',
+									px: 2,
+									py: 1,
+									'&:hover': {
+										backgroundColor: '#003366',
+									},
+								}}
+							>
+								{sincronizandoSiesa ? (
+									<>
+										<CircularProgress size={18} sx={{ marginRight: 1 }} />
+										Sincronizando...
+									</>
+								) : (
+									'Sincronizar SIESA'
+								)}
+							</Button>
+						</Box>
+					</Box>
 				</Paper>
 
 				{/* SECCIÓN ROLES */}
@@ -829,7 +1068,7 @@ export default function ConfiguracionPage() {
 					color: '#fff',
 					zIndex: (theme) => theme.zIndex.drawer + 1,
 				}}
-				open={saving}
+				open={saving || sincronizandoSiesa}
 			>
 				<CircularProgress color="inherit" />
 			</Backdrop>

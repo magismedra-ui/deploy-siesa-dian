@@ -174,8 +174,9 @@ const procesarConciliacion = async (ejecucionId = null) => {
 		}
 
 		// 3. Agrupar documentos por NIT y num_factura
+		// Regla de conciliación: se compara nit_proveedor (SIESA) === nit_proveedor (DIAN)
+		// y num_factura (SIESA) === num_factura (DIAN). Solo se emparejan documentos que cumplan ambas condiciones.
 		// IMPORTANTE: Conservar TODOS los documentos, no agrupar múltiples documentos de la misma fuente
-		// Cada documento debe procesarse individualmente
 		const documentosAgrupados = {};
 		for (const doc of documentosPendientes) {
 			const key = `${doc.nit_proveedor}_${doc.num_factura}`;
@@ -185,7 +186,6 @@ const procesarConciliacion = async (ejecucionId = null) => {
 					siesa: [],
 				};
 			}
-			// Agregar TODOS los documentos según su fuente (no solo el primero)
 			if (doc.fuente === 'DIAN') {
 				documentosAgrupados[key].dian.push(doc);
 			} else if (doc.fuente === 'SIESA') {
@@ -221,11 +221,11 @@ const procesarConciliacion = async (ejecucionId = null) => {
 		// IMPORTANTE: Emparejar documentos uno a uno, conservando todos los registros
 		for (const [key, grupo] of gruposEmparejables) {
 			try {
-				// Emparejar documentos DIAN con documentos SIESA uno a uno
-				// Si hay más documentos de una fuente que de la otra, los excedentes se procesarán como no emparejables
+				// Emparejar documentos DIAN con documentos SIESA uno a uno.
+				// En este grupo, todos comparten el mismo nit_proveedor y num_factura, por tanto
+				// docDian.nit_proveedor === docSiesa.nit_proveedor y docDian.num_factura === docSiesa.num_factura.
 				const minLength = Math.min(grupo.dian.length, grupo.siesa.length);
 				
-				// Procesar emparejamientos uno a uno
 				for (let i = 0; i < minLength; i++) {
 					const docDian = grupo.dian[i];
 					const docSiesa = grupo.siesa[i];

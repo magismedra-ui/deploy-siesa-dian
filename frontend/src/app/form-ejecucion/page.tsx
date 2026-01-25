@@ -230,6 +230,7 @@ export default function EjecucionPage() {
 		}
 	}
 
+
 	const mostrarMensaje = (
 		type: 'success' | 'error',
 		title: string,
@@ -831,7 +832,7 @@ export default function EjecucionPage() {
 				</Box>
 
 				<Grid2 container spacing={3}>
-					{/* COLUMNA 1: SUBIR DOCUMENTO */}
+					{/* COLUMNA IZQUIERDA: Subir Documento Excel */}
 					<Grid2 size={{ xs: 12, md: 6 }}>
 						<Paper sx={{ padding: 3 }}>
 							<Typography variant="h6" sx={{ marginBottom: 2 }}>
@@ -911,15 +912,16 @@ export default function EjecucionPage() {
 								)}
 							</Box>
 						</Paper>
-            </Grid2>
+					</Grid2>
 
-					{/* COLUMNA 2: FORMULARIO DE CONFIGURACIÓN DEL SCHEDULER */}
+					{/* COLUMNA DERECHA: Ejecutar Conciliación */}
 					<Grid2 size={{ xs: 12, md: 6 }}>
 						<Paper sx={{ padding: 3 }}>
 							<Typography variant="h6" sx={{ marginBottom: 2 }}>
 								2. Ejecutar Conciliación
 							</Typography>
 							<Box sx={{ display: 'flex', flexDirection: 'column', gap: 3, opacity: formularioDeshabilitado ? 0.6 : 1, pointerEvents: formularioDeshabilitado ? 'none' : 'auto' }}>
+								{/* Sección Scheduler */}
 								<FormControl fullWidth variant="filled">
 									<InputLabel>CONCILIACION</InputLabel>
 									<Select

@@ -24,9 +24,12 @@ exports.createDocumento = async (req, res) => {
       return res.status(404).json({ message: "Ejecución no encontrada" });
     }
 
+    const nitProveedorTrimmed =
+      nit_proveedor != null ? String(nit_proveedor).trim() : nit_proveedor;
+
     const newDocumento = await DocumentoStaging.create({
       fuente,
-      nit_proveedor,
+      nit_proveedor: nitProveedorTrimmed,
       num_factura,
       prefijo,
       razon_social,
@@ -127,7 +130,10 @@ exports.updateDocumento = async (req, res) => {
     }
 
     documento.fuente = fuente || documento.fuente;
-    documento.nit_proveedor = nit_proveedor || documento.nit_proveedor;
+    documento.nit_proveedor =
+      nit_proveedor !== undefined
+        ? String(nit_proveedor).trim()
+        : documento.nit_proveedor;
     documento.num_factura = num_factura || documento.num_factura;
     documento.prefijo = prefijo !== undefined ? prefijo : documento.prefijo;
     documento.razon_social = razon_social !== undefined ? razon_social : documento.razon_social;

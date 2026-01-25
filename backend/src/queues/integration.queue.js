@@ -68,10 +68,13 @@ try {
         if (dianResults.status === "fulfilled") dianData = dianResults.value;
         else console.error("Fallo DIAN:", dianResults.reason);
 
+        const trimNit = (v) =>
+          v != null ? String(v).trim() : null;
+
         // Preparar bulk insert
         const bulkSiesa = siesaData.map((item) => ({
           num_factura: item.idDocumento,
-          nit_proveedor: item.nitProveedor,
+          nit_proveedor: trimNit(item.nitProveedor),
           prefijo: item.docto_proveedor || null,
           razon_social: item.razon_social || null,
           fecha_emision: item.fechaEmision,
@@ -84,7 +87,7 @@ try {
 
         const bulkDian = dianData.map((item) => ({
           num_factura: item.idDocumento,
-          nit_proveedor: item.nitProveedor,
+          nit_proveedor: trimNit(item.nitProveedor),
           prefijo: item.Prefijo || null,
           razon_social: item['Nombre Receptor'] || item.nombreReceptor || null,
           fecha_emision: item.fechaEmision,

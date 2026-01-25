@@ -68,7 +68,7 @@ const DocumentoStaging = sequelize.define(
     indexes: [
       {
         unique: true,
-        fields: ['fuente', 'nit_proveedor', 'num_factura'],
+        fields: ['fuente', 'nit_proveedor', 'num_factura', 'prefijo'],
         name: 'idx_unique_documento'
       }
     ]

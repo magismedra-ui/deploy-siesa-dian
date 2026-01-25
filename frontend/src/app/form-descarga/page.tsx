@@ -132,8 +132,8 @@ function TablaEstado({
 							<TableCell>ID</TableCell>
 							<TableCell>Fuente</TableCell>
 							<TableCell>NIT Proveedor</TableCell>
-							<TableCell>Número Factura</TableCell>
 							<TableCell>Prefijo</TableCell>
+							<TableCell>Número Factura</TableCell>
 							<TableCell>Razón Social</TableCell>
 							<TableCell>Fecha Emisión</TableCell>
 							{esConciliacion ? (
@@ -173,8 +173,8 @@ function TablaEstado({
 									<TableCell>{documento.id}</TableCell>
 									<TableCell>{documento.fuente}</TableCell>
 									<TableCell>{documento.nit_proveedor}</TableCell>
-									<TableCell>{documento.num_factura}</TableCell>
 									<TableCell>{documento.prefijo || '-'}</TableCell>
+									<TableCell>{documento.num_factura}</TableCell>
 									<TableCell>{documento.razon_social || '-'}</TableCell>
 									<TableCell>
 										{documento.fecha_emision
@@ -696,8 +696,8 @@ export default function DescargaPage() {
 					ID: doc.id,
 					Fuente: doc.fuente,
 					'NIT Proveedor': doc.nit_proveedor,
-					'Número Factura': doc.num_factura,
 					Prefijo: doc.prefijo || '',
+					'Número Factura': doc.num_factura,
 					'Razón Social': doc.razon_social || '',
 					'Fecha Emisión': doc.fecha_emision
 						? new Date(doc.fecha_emision).toLocaleDateString('es-ES')
@@ -750,8 +750,8 @@ export default function DescargaPage() {
 						{ wch: 10 }, // ID
 						{ wch: 12 }, // Fuente
 						{ wch: 15 }, // NIT Proveedor
-						{ wch: 20 }, // Número Factura
 						{ wch: 12 }, // Prefijo
+						{ wch: 20 }, // Número Factura
 						{ wch: 30 }, // Razón Social
 						{ wch: 15 }, // Fecha Emisión
 						{ wch: 15 }, // Valor DIAN
@@ -765,8 +765,8 @@ export default function DescargaPage() {
 						{ wch: 10 }, // ID
 						{ wch: 12 }, // Fuente
 						{ wch: 15 }, // NIT Proveedor
-						{ wch: 20 }, // Número Factura
 						{ wch: 12 }, // Prefijo
+						{ wch: 20 }, // Número Factura
 						{ wch: 30 }, // Razón Social
 						{ wch: 15 }, // Fecha Emisión
 						{ wch: 15 }, // Valor Total
