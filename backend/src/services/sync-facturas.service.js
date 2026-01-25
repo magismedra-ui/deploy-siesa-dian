@@ -1,5 +1,8 @@
 const { log, calcularDuracionMinutos } = require('../logger/redisLogger');
-const { syncFacturasInterno } = require('../controllers/siesa.controller');
+const {
+	syncFacturasInterno,
+	syncFacturasUnaConsulta,
+} = require('../controllers/siesa.controller');
 
 /**
  * Instancia única de ejecución para evitar concurrencia
@@ -19,6 +22,123 @@ const getSyncDateRange = () => {
 		fechaInicio: fechaInicio.toISOString().split('T')[0], // YYYY-MM-DD
 		fechaFin: fechaFin.toISOString().split('T')[0],
 	};
+};
+
+/** Formato YYYYMMDD para una fecha */
+const toYYYYMMDD = (date) => {
+	const y = date.getFullYear();
+	const m = String(date.getMonth() + 1).padStart(2, '0');
+	const d = String(date.getDate()).padStart(2, '0');
+	return `${y}${m}${d}`;
+};
+
+/** Flag para evitar concurrencia del sync automático (8h) */
+let isSyncAutomaticoRunning = false;
+
+/**
+ * Sincronización SIESA para modo automático de conciliación:
+ * - fechaFin = fecha actual, fechaInicio = dos días antes (formato YYYYMMDD)
+ * - idCia e idProveedor por defecto (config/env)
+ * - Ejecuta listar_facturas_servicios y luego listar_facturas_proveedores
+ * - Guarda en proc_documentos_staging con la misma lógica existente
+ */
+const ejecutarSyncSiesaAutomatico = async (triggeredBy = 'scheduler-8h') => {
+	if (isSyncAutomaticoRunning) {
+		console.warn(
+			'[Sync SIESA Automático] Ya hay una ejecución en curso. Se omite.'
+		);
+		return {
+			success: false,
+			message: 'Sincronización automática ya en ejecución',
+			alreadyRunning: true,
+		};
+	}
+
+	isSyncAutomaticoRunning = true;
+	const startTime = Date.now();
+	const jobId = `sync-siesa-automatico-${Date.now()}`;
+	const usuarioId = 1;
+	const idCia = process.env.SIESA_CIA || '5';
+	const idProveedor = process.env.SIESA_PROVIDER_ID || 'I2D';
+
+	const hoy = new Date();
+	const fechaFin = toYYYYMMDD(hoy);
+	const fechaInicioDate = new Date(hoy);
+	fechaInicioDate.setDate(fechaInicioDate.getDate() - 2);
+	const fechaInicio = toYYYYMMDD(fechaInicioDate);
+
+	try {
+		await log({
+			jobId,
+			proceso: 'sync-siesa-automatico',
+			nivel: 'info',
+			mensaje: `Inicio sync SIESA automático. ${fechaInicio}-${fechaFin}. Trigger: ${triggeredBy}`,
+		});
+		console.log(
+			`[Sync SIESA Automático] Iniciando: ${fechaInicio} a ${fechaFin} (idCia=${idCia}, idProveedor=${idProveedor})`
+		);
+
+		const r1 = await syncFacturasUnaConsulta(
+			fechaInicio,
+			fechaFin,
+			'listar_facturas_servicios',
+			idCia,
+			idProveedor,
+			usuarioId
+		);
+		const r2 = await syncFacturasUnaConsulta(
+			fechaInicio,
+			fechaFin,
+			'listar_facturas_proveedores',
+			idCia,
+			idProveedor,
+			usuarioId
+		);
+
+		const duracionSegundos = (Date.now() - startTime) / 1000;
+		const registrosTotal = r1.registrosProcesados + r2.registrosProcesados;
+
+		await log({
+			jobId,
+			proceso: 'sync-siesa-automatico',
+			nivel: 'info',
+			mensaje: `Sync SIESA automático completado. Servicios: ${r1.registrosProcesados}, Proveedores: ${r2.registrosProcesados}. Total: ${registrosTotal}`,
+			duracionSegundos,
+		});
+
+		return {
+			success: true,
+			ejecucionIdServicios: r1.ejecucionId,
+			ejecucionIdProveedores: r2.ejecucionId,
+			registrosProcesados: registrosTotal,
+			registrosServicios: r1.registrosProcesados,
+			registrosProveedores: r2.registrosProcesados,
+			duracionSegundos,
+			fechaInicio,
+			fechaFin,
+		};
+	} catch (error) {
+		const duracionSegundos = (Date.now() - startTime) / 1000;
+		const errorMessage =
+			error.response?.data?.message || error.message || 'Error desconocido';
+
+		await log({
+			jobId,
+			proceso: 'sync-siesa-automatico',
+			nivel: 'error',
+			mensaje: `Error sync SIESA automático: ${errorMessage}`,
+			duracionSegundos,
+		});
+		console.error('[Sync SIESA Automático] Error:', errorMessage);
+
+		return {
+			success: false,
+			error: errorMessage,
+			duracionSegundos,
+		};
+	} finally {
+		isSyncAutomaticoRunning = false;
+	}
 };
 
 /**
@@ -193,6 +313,7 @@ const isSyncRunning = () => {
 
 module.exports = {
 	ejecutarSyncFacturas,
+	ejecutarSyncSiesaAutomatico,
 	getLastExecution,
 	isSyncRunning,
 };

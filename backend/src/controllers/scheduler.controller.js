@@ -15,10 +15,13 @@ const {
 	restartConciliacionScheduler,
 } = require('../services/conciliacion-scheduler.service');
 const { ejecutarSyncFacturas, getLastExecution, isSyncRunning } = require('../services/sync-facturas.service');
+const { log } = require('../logger/redisLogger');
 
 /**
  * Endpoint POST /api/v1/scheduler/config
- * Configurar scheduler dinámicamente
+ * Configurar scheduler dinámicamente.
+ * Los schedulers se ejecutan en el servidor de forma independiente;
+ * cerrar el frontend no detiene las tareas programadas (sync SIESA cada 8h y conciliación).
  */
 const configScheduler = async (req, res, next) => {
 	try {
@@ -71,10 +74,10 @@ const configScheduler = async (req, res, next) => {
 		// 1. Controlar scheduler de sincronización de facturas
 		try {
 			if (newEnabled === true) {
-				// Habilitar scheduler de sincronización (cada 12 horas)
+				// Habilitar scheduler de sincronización SIESA (cada 8 h, primera al activar)
 				restartSyncFacturasScheduler();
 			} else {
-				// Deshabilitar scheduler de sincronización
+				// Deshabilitar (manual o pausar)
 				stopSyncFacturasScheduler();
 			}
 		} catch (error) {
@@ -89,11 +92,26 @@ const configScheduler = async (req, res, next) => {
 				// Reiniciar siempre para aplicar cambios de cron
 				restartConciliacionScheduler();
 			} else {
-				// null: detener completamente
+				// null = Pausar: detener completamente
 				stopConciliacionScheduler();
 			}
 		} catch (error) {
 			console.error('[Scheduler Config] Error al controlar scheduler de conciliación:', error);
+		}
+
+		// 3. Log en tiempo real cuando se activa Pausar (para que aparezca en el frontend)
+		if (newEnabled === null) {
+			console.log('[Scheduler Config] Modo pausa activado. Sincronización SIESA y conciliación programada detenidas.');
+			try {
+				await log({
+					jobId: `scheduler-pausa-${Date.now()}`,
+					proceso: 'scheduler-config',
+					nivel: 'info',
+					mensaje: 'Modo pausa activado. Sincronización SIESA (cada 8h) y conciliación programada han sido detenidas. No se ejecutarán tareas automáticas hasta que reactive Automatico o Manual.',
+				});
+			} catch (logErr) {
+				console.warn('[Scheduler Config] No se pudo escribir log de pausa en Redis:', logErr.message);
+			}
 		}
 
 		// Siempre enviar respuesta exitosa después de actualizar la configuración

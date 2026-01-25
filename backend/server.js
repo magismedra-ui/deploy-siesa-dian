@@ -59,38 +59,33 @@ const startServer = async () => {
     console.warn('[Server] Conciliación Worker no disponible (Redis requerido):', error.message);
   }
   
-  // 1. Ejecutar sincronización de facturas al iniciar el servidor (siempre, de forma asíncrona)
-  // Usar setImmediate para no bloquear el inicio del servidor
-  setImmediate(() => {
-    console.log('[Server] Ejecutando sincronización inicial de facturas...');
-    ejecutarSyncFacturas('bootstrap').catch((error) => {
-      console.error('[Server] Error en sincronización inicial:', error.message);
-    });
-  });
-  
-  // 2. Configurar schedulers según variables globales
+  // 1. Configurar schedulers según variables globales
   const schedulerEnabled = getSchedulerEnabled();
-  
+
   if (schedulerEnabled === true) {
-    // Modo automático: configurar todos los schedulers
+    // Modo automático: sync SIESA cada 8h (primera al activar) + conciliación según cronExpressionn
     console.log('[Server] Modo automático activado. Configurando schedulers...');
-    
-    // Scheduler de sincronización (cada 12 horas)
-    setupSyncFacturasScheduler();
-    
-    // Scheduler de conciliación (según cronExpressionn)
+    setupSyncFacturasScheduler(); // Primera sync al activar y luego cada 8h
     setupConciliacionScheduler();
   } else if (schedulerEnabled === false) {
-    // Modo manual: no ejecutar sync facturas automáticamente, pero sí conciliación si hay cronExpressionn
+    // Modo manual: sync inicial única (30 días, 1 consulta); conciliación según cronExpressionn
     console.log('[Server] Modo manual activado (schedulerEnabled=false).');
-    console.log('[Server] Scheduler de sincronización de facturas deshabilitado.');
-    console.log('[Server] Configurando scheduler de conciliación si hay cronExpressionn...');
-    
-    // Scheduler de conciliación (según cronExpressionn) - funciona en modo manual también
+    setImmediate(() => {
+      console.log('[Server] Ejecutando sincronización inicial de facturas...');
+      ejecutarSyncFacturas('bootstrap').catch((err) => {
+        console.error('[Server] Error en sincronización inicial:', err.message);
+      });
+    });
     setupConciliacionScheduler();
   } else {
     // null: completamente deshabilitado
     console.log('[Server] Schedulers deshabilitados (schedulerEnabled = null)');
+    setImmediate(() => {
+      console.log('[Server] Ejecutando sincronización inicial de facturas...');
+      ejecutarSyncFacturas('bootstrap').catch((err) => {
+        console.error('[Server] Error en sincronización inicial:', err.message);
+      });
+    });
   }
 
   app.use(responseTime());

@@ -329,6 +329,132 @@ const syncFacturasInterno = async (fechaInicio, fechaFin, usuarioId = 1) => {
 };
 
 /**
+ * Sincroniza una única consulta SIESA a proc_documentos_staging (lógica reutilizable).
+ * Usado por syncFacturasConParametros y por el sync automático cada 8h.
+ * @param {string} fechaInicio - YYYYMMDD
+ * @param {string} fechaFin - YYYYMMDD
+ * @param {string} nombreConsulta - listar_facturas_servicios | listar_facturas_proveedores
+ * @param {string} idCia - por defecto "5"
+ * @param {string} idProveedor - por defecto "I2D"
+ * @param {number} usuarioId - usuario del sistema (ej. 1 para automático)
+ * @returns {Promise<{ ejecucionId: number, registrosProcesados: number, count: number }>}
+ */
+const syncFacturasUnaConsulta = async (
+  fechaInicio,
+  fechaFin,
+  nombreConsulta,
+  idCia,
+  idProveedor,
+  usuarioId
+) => {
+  const ejecucion = await Ejecucion.create({
+    usuario_id: usuarioId,
+    fecha_inicio: new Date(),
+    estado: "PENDIENTE",
+    docs_procesados: 0,
+    tolerancia_usada: 0,
+  });
+
+  let dataSiesa = [];
+  try {
+    dataSiesa = await siesaAdapterService.getFacturas(
+      fechaInicio,
+      fechaFin,
+      nombreConsulta,
+      idCia,
+      idProveedor
+    );
+  } catch (siesaError) {
+    await ejecucion.update({
+      estado: "FALLIDO",
+      fecha_fin: new Date(),
+    });
+    throw siesaError;
+  }
+
+  if (!dataSiesa || dataSiesa.length === 0) {
+    return {
+      ejecucionId: ejecucion.id,
+      registrosProcesados: 0,
+      count: 0,
+    };
+  }
+
+  const BATCH_SIZE = 1000;
+  const documentosParaInsertar = dataSiesa.map((item) => {
+    let fechaEmision = item.fecha || item.FechaEmision;
+    if (fechaEmision && fechaEmision.length >= 10) {
+      fechaEmision = fechaEmision.substring(0, 10);
+    } else {
+      fechaEmision = new Date().toISOString().slice(0, 10);
+    }
+
+    const nitRaw = item.id_tercero || item.NitProveedor;
+    const nitProveedor = nitRaw != null ? String(nitRaw).trim() : null;
+
+    return {
+      fuente: "SIESA",
+      nit_proveedor: nitProveedor,
+      num_factura: item.numero_proveedor || item.NumeroDocumento || "SIN_REF",
+      prefijo: item.docto_proveedor || null,
+      razon_social: item.razon_social || null,
+      fecha_emision: fechaEmision,
+      valor_total: item.vlr_neto || item.ValorTotal || 0,
+      impuestos: item.vlr_imp || item.Iva || 0,
+      payload_original: item,
+      ejecucion_id: ejecucion.id,
+    };
+  });
+
+  let totalProcesados = 0;
+  const keySiesa = (d) =>
+    `${d.nit_proveedor || ''}|${d.num_factura || ''}|${d.prefijo ?? ''}`;
+
+  const filtrarDuplicadosSiesa = async (lote) => {
+    if (!lote || lote.length === 0) return [];
+    const nits = [...new Set(lote.map((d) => d.nit_proveedor).filter(Boolean))];
+    if (nits.length === 0) return lote;
+    const existing = await DocumentoStaging.findAll({
+      where: {
+        fuente: "SIESA",
+        nit_proveedor: { [Op.in]: nits },
+      },
+      attributes: ["nit_proveedor", "num_factura", "prefijo"],
+      raw: true,
+    });
+    const existingKeys = new Set(
+      existing.map((r) =>
+        `${r.nit_proveedor || ''}|${r.num_factura || ''}|${r.prefijo ?? ''}`
+      )
+    );
+    const seen = new Set();
+    return lote.filter((d) => {
+      const k = keySiesa(d);
+      if (existingKeys.has(k) || seen.has(k)) return false;
+      seen.add(k);
+      return true;
+    });
+  };
+
+  for (let i = 0; i < documentosParaInsertar.length; i += BATCH_SIZE) {
+    const lote = documentosParaInsertar.slice(i, i + BATCH_SIZE);
+    const aInsertar = await filtrarDuplicadosSiesa(lote);
+    if (aInsertar.length > 0) {
+      await DocumentoStaging.bulkCreate(aInsertar, {
+        ignoreDuplicates: true,
+      });
+      totalProcesados += aInsertar.length;
+    }
+  }
+
+  return {
+    ejecucionId: ejecucion.id,
+    registrosProcesados: totalProcesados,
+    count: dataSiesa.length,
+  };
+};
+
+/**
  * Sincroniza facturas desde SIESA con parámetros personalizados
  * @route POST /api/v1/siesa/sync-con-parametros
  */
@@ -336,7 +462,6 @@ const syncFacturasConParametros = async (req, res, next) => {
   try {
     const { fechaInicio, fechaFin, idCia, nombreConsulta, idProveedor } = req.body;
 
-    // Obtener usuario del token (inyectado por auth middleware)
     const usuarioId = req.user ? req.user.id : null;
 
     if (!usuarioId) {
@@ -350,7 +475,6 @@ const syncFacturasConParametros = async (req, res, next) => {
       });
     }
 
-    // Validar formato de fechas (YYYYMMDD)
     const fechaRegex = /^\d{8}$/;
     if (!fechaRegex.test(fechaInicio) || !fechaRegex.test(fechaFin)) {
       return res.status(400).json({
@@ -359,10 +483,9 @@ const syncFacturasConParametros = async (req, res, next) => {
       });
     }
 
-    // Validar que las fechas sean válidas y parsearlas
     const parseFecha = (fechaStr) => {
       const year = parseInt(fechaStr.substring(0, 4), 10);
-      const month = parseInt(fechaStr.substring(4, 6), 10) - 1; // Mes es 0-indexed
+      const month = parseInt(fechaStr.substring(4, 6), 10) - 1;
       const day = parseInt(fechaStr.substring(6, 8), 10);
       return new Date(year, month, day);
     };
@@ -370,9 +493,8 @@ const syncFacturasConParametros = async (req, res, next) => {
     const fechaInicioDate = parseFecha(fechaInicio);
     const fechaFinDate = parseFecha(fechaFin);
     const fechaActual = new Date();
-    fechaActual.setHours(0, 0, 0, 0); // Resetear horas para comparar solo fechas
+    fechaActual.setHours(0, 0, 0, 0);
 
-    // Validar que fechaFin no exceda la fecha actual
     if (fechaFinDate > fechaActual) {
       return res.status(400).json({
         error: "Fecha fin inválida",
@@ -380,7 +502,6 @@ const syncFacturasConParametros = async (req, res, next) => {
       });
     }
 
-    // Validar que fechaInicio sea igual o anterior a fechaFin
     if (fechaInicioDate > fechaFinDate) {
       return res.status(400).json({
         error: "Rango de fechas inválido",
@@ -388,12 +509,10 @@ const syncFacturasConParametros = async (req, res, next) => {
       });
     }
 
-    // Valores por defecto
     const cia = idCia || "5";
     const consulta = nombreConsulta || "listar_facturas_servicios";
     const proveedorId = idProveedor || process.env.SIESA_PROVIDER_ID || "I2D";
 
-    // Validar nombreConsulta
     const consultasPermitidas = [
       "listar_facturas_servicios",
       "listar_facturas_proveedores",
@@ -405,135 +524,24 @@ const syncFacturasConParametros = async (req, res, next) => {
       });
     }
 
-    // 1. Crear registro en proc_ejecuciones
-    const ejecucion = await Ejecucion.create({
-      usuario_id: usuarioId,
-      fecha_inicio: new Date(),
-      estado: "PENDIENTE",
-      docs_procesados: 0,
-      tolerancia_usada: 0,
-    });
+    const resultado = await syncFacturasUnaConsulta(
+      fechaInicio,
+      fechaFin,
+      consulta,
+      cia,
+      proveedorId,
+      usuarioId
+    );
 
-    // 2. Consultar SIESA con los parámetros proporcionados
-    let dataSiesa = [];
-
-    try {
-      dataSiesa = await siesaAdapterService.getFacturas(
-        fechaInicio,
-        fechaFin,
-        consulta,
-        cia,
-        proveedorId
-      );
-    } catch (siesaError) {
-      // Si falla la consulta a SIESA, marcamos la ejecución como FALLIDA
-      await ejecucion.update({
-        estado: "FALLIDO",
-        fecha_fin: new Date(),
-      });
-      throw siesaError;
-    }
-
-    if (!dataSiesa || dataSiesa.length === 0) {
-      return res.status(200).json({
-        success: true,
-        message:
-          "No se encontraron facturas en SIESA para el rango especificado",
-        ejecucionId: ejecucion.id,
-        count: 0,
-        parametrosUsados: {
-          fechaInicio,
-          fechaFin,
-          idCia: cia,
-          nombreConsulta: consulta,
-          idProveedor: proveedorId,
-        },
-      });
-    }
-
-    // 3. Preparar datos y realizar inserción por lotes
-    const BATCH_SIZE = 1000;
-    const documentosParaInsertar = dataSiesa.map((item) => {
-      let fechaEmision = item.fecha || item.FechaEmision;
-
-      // Intentar convertir a YYYY-MM-DD
-      if (fechaEmision && fechaEmision.length >= 10) {
-        fechaEmision = fechaEmision.substring(0, 10);
-      } else {
-        fechaEmision = new Date().toISOString().slice(0, 10);
-      }
-
-      const nitRaw = item.id_tercero || item.NitProveedor;
-      const nitProveedor = nitRaw != null ? String(nitRaw).trim() : null;
-
-      return {
-        fuente: "SIESA",
-        nit_proveedor: nitProveedor,
-        num_factura: item.numero_proveedor || item.NumeroDocumento || "SIN_REF",
-        prefijo: item.docto_proveedor || null,
-        razon_social: item.razon_social || null,
-        fecha_emision: fechaEmision,
-        valor_total: item.vlr_neto || item.ValorTotal || 0,
-        impuestos: item.vlr_imp || item.Iva || 0,
-        payload_original: item,
-        ejecucion_id: ejecucion.id,
-      };
-    });
-
-    let totalProcesados = 0;
-
-    const keySiesa = (d) =>
-      `${d.nit_proveedor || ''}|${d.num_factura || ''}|${d.prefijo ?? ''}`;
-
-    const filtrarDuplicadosSiesa = async (lote) => {
-      if (!lote || lote.length === 0) return [];
-      const nits = [...new Set(lote.map((d) => d.nit_proveedor).filter(Boolean))];
-      if (nits.length === 0) return lote;
-      const existing = await DocumentoStaging.findAll({
-        where: {
-          fuente: "SIESA",
-          nit_proveedor: { [Op.in]: nits },
-        },
-        attributes: ["nit_proveedor", "num_factura", "prefijo"],
-        raw: true,
-      });
-      const existingKeys = new Set(
-        existing.map((r) =>
-          `${r.nit_proveedor || ''}|${r.num_factura || ''}|${r.prefijo ?? ''}`
-        )
-      );
-      const seen = new Set();
-      return lote.filter((d) => {
-        const k = keySiesa(d);
-        if (existingKeys.has(k) || seen.has(k)) return false;
-        seen.add(k);
-        return true;
-      });
-    };
-
-    // Procesar en chunks
-    for (let i = 0; i < documentosParaInsertar.length; i += BATCH_SIZE) {
-      const lote = documentosParaInsertar.slice(i, i + BATCH_SIZE);
-
-      try {
-        const aInsertar = await filtrarDuplicadosSiesa(lote);
-        if (aInsertar.length > 0) {
-          await DocumentoStaging.bulkCreate(aInsertar, {
-            ignoreDuplicates: true,
-          });
-          totalProcesados += aInsertar.length;
-        }
-      } catch (err) {
-        console.error("Error insertando lote:", err.message);
-        throw err;
-      }
-    }
-
-    res.status(200).json({
+    return res.status(200).json({
       success: true,
-      message: "Proceso de sincronización completado exitosamente",
-      ejecucionId: ejecucion.id,
-      registrosProcesados: totalProcesados,
+      message:
+        resultado.count === 0
+          ? "No se encontraron facturas en SIESA para el rango especificado"
+          : "Proceso de sincronización completado exitosamente",
+      ejecucionId: resultado.ejecucionId,
+      registrosProcesados: resultado.registrosProcesados,
+      count: resultado.count,
       parametrosUsados: {
         fechaInicio,
         fechaFin,
@@ -551,5 +559,6 @@ module.exports = {
   getFacturas,
   syncFacturas,
   syncFacturasInterno,
+  syncFacturasUnaConsulta,
   syncFacturasConParametros,
 };

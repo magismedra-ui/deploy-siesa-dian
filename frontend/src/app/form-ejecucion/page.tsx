@@ -213,7 +213,11 @@ export default function EjecucionPage() {
 				cronExpressionn,
 			}
 		await configurarScheduler(data)
-		mostrarMensaje('success', 'Éxito', 'Configuración del scheduler guardada correctamente')
+		const mensaje =
+			schedulerEnabled === true
+				? 'Modo automático activado. La sincronización con SIESA (cada 8 h) y la conciliación seguirán ejecutándose en el servidor aunque cierre esta ventana.'
+				: 'Configuración del scheduler guardada correctamente.'
+		mostrarMensaje('success', 'Éxito', mensaje)
 		
 		// La barra de progreso se activará cuando lleguen los logs del proceso en segundo plano
 		} catch (error) {
