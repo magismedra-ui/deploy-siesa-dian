@@ -39,8 +39,9 @@ services:
   nginx:
     image: nginx:alpine
     container_name: nginx_proxy
+    # Puerto 8080 en host para evitar conflicto con Apache/Nginx u otro servicio en :80
     ports:
-      - "80:80"
+      - "8080:80"
     volumes:
       - ./nginx/conf.d:/etc/nginx/conf.d:ro
     depends_on:
